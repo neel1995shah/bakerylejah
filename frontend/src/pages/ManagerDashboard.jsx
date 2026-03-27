@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
-import { Package, TrendingUp, AlertTriangle, CheckCircle, Truck } from 'lucide-react';
+import { Package, TrendingUp, AlertTriangle, CheckCircle, Truck, ArrowRight } from 'lucide-react';
+import gsap from 'gsap';
 
 export default function ManagerDashboard() {
   const [orders, setOrders] = useState([]);
   const [inventory, setInventory] = useState([]);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -19,6 +21,12 @@ export default function ManagerDashboard() {
         ]);
         setOrders(ordersRes.data);
         setInventory(invRes.data);
+
+        // Staggered entrance animation
+        gsap.fromTo(".dash-card",
+          { y: 30, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: "power2.out" }
+        );
       } catch (err) {
         console.error('Failed to fetch dashboard data', err);
       }
@@ -41,65 +49,93 @@ export default function ManagerDashboard() {
   const lowStock = inventory.filter(i => i.quantity <= i.reorderLevel).length;
 
   return (
-    <div className="space-y-6">
-      {/* Top Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard title="Active Orders" value={activeOrders} icon={<Truck color="#C9971A" size={28}/>} />
-        <StatCard title="Total Expected Revenue" value={`$${totalDues.toFixed(2)}`} icon={<TrendingUp color="#6B7A4A" size={28}/>} />
-        <StatCard title="Total Items Tracked" value={inventory.length} icon={<Package color="#6B7A4A" size={28}/>} />
-        <StatCard title="Low Stock Alerts" value={lowStock} icon={<AlertTriangle color="#ef4444" size={28}/>} alert={lowStock > 0} />
+    <div ref={containerRef} className="space-y-6 pb-20">
+      {/* Header Info */}
+      <div className="dash-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl lg:text-4xl font-black text-primary tracking-tight">System Status</h1>
+          <p className="text-primary/70 font-medium">Real-time overview of your bakery's logistics.</p>
+        </div>
+      </div>
+
+      {/* Top Stats - Compact 2-Column Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Active Route" value={activeOrders} suffix="Orders" icon={<Truck size={20} />} trend="live" />
+        <StatCard title="Target Revenue" value={`$${totalDues.toFixed(0)}`} icon={<TrendingUp size={20} />} />
+        <StatCard title="Total Stock" value={inventory.length} suffix="Items" icon={<Package size={20} />} />
+        <StatCard title="Stock Warnings" value={lowStock} icon={<AlertTriangle size={20} />} alert={lowStock > 0} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Orders Snippet */}
-        <div className="bg-surface rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-gray-800">Recent Deliveries</h3>
+        <div className="dash-card glass-card !p-0 overflow-hidden flex flex-col min-h-[250px]">
+          <div className="p-6 border-b border-black/5 flex justify-between items-center">
+            <h3 className="text-xl font-black text-primary tracking-tight">Recent Activity</h3>
+            {orders.length > 0 && (
+              <button className="min-w-[44px] min-h-[44px] text-xs font-bold uppercase tracking-widest text-primary/70 hover:text-primary transition-colors flex items-center justify-center gap-1 active:scale-95">
+                View All <ArrowRight size={14} />
+              </button>
+            )}
           </div>
-          <div className="space-y-4">
+          <div className="p-4 space-y-3 flex-1 flex flex-col">
             {orders.slice(-5).reverse().map((o) => (
-              <div key={o._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-semibold text-gray-800">#{o._id.slice(-6).toUpperCase()}</p>
-                  <p className="text-sm text-gray-500">{o.customer?.name || 'Walk-in'}</p>
+              <div key={o._id} className="group flex items-center justify-between p-4 bg-white/30 rounded-2xl border border-transparent hover:border-black/5 hover:bg-white/60 transition-all duration-300">
+                <div className="flex items-center gap-4">
+                  <div className={`w-3 h-3 rounded-full animate-pulse ${getStatusPulse(o.deliveryStatus)}`} />
+                  <div>
+                    <p className="font-bold text-primary group-hover:translate-x-1 transition-transform tracking-tight text-sm sm:text-base">
+                      {o.customer?.name || 'Walk-in'}
+                    </p>
+                    <p className="text-[10px] font-black uppercase text-primary/60">#{o._id.slice(-6)}</p>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-gray-800">${o.totalAmount.toFixed(2)}</p>
-                  <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full mt-1 ${getStatusColor(o.deliveryStatus)}`}>
+                  <p className="font-black text-primary text-sm sm:text-base">${o.totalAmount.toFixed(2)}</p>
+                  <span className={`inline-block px-2 py-0.5 text-[10px] font-black rounded-full mt-1 uppercase tracking-tighter ${getStatusColor(o.deliveryStatus)}`}>
                     {o.deliveryStatus}
                   </span>
                 </div>
               </div>
             ))}
-            {orders.length === 0 && <p className="text-gray-500 text-sm py-4">No active orders.</p>}
+            {orders.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 opacity-60">
+                <Package size={40} className="text-primary/30 mb-2" />
+                <p className="text-primary/70 text-sm font-bold uppercase tracking-widest">No active orders</p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Inventory Snippet */}
-        <div className="bg-surface rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-gray-800">Inventory Alerts</h3>
+        <div className="dash-card glass-card !p-0 overflow-hidden flex flex-col min-h-[250px]">
+          <div className="p-6 border-b border-black/5 flex justify-between items-center">
+            <h3 className="text-xl font-black text-primary tracking-tight">Stock Alerts</h3>
+            {lowStock > 0 && <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full">{lowStock} CRITICAL</span>}
           </div>
-          <div className="space-y-4">
-            {inventory.filter(i => i.quantity <= i.reorderLevel).map(i => (
-              <div key={i._id} className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="text-red-500" size={20} />
+          <div className="p-4 space-y-3 flex-1 flex flex-col">
+            {inventory.filter(i => i.quantity <= i.reorderLevel).slice(0, 4).map(i => (
+              <div key={i._id} className="flex items-center justify-between p-4 bg-red-500/5 rounded-2xl border border-red-500/10">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 flex flex-shrink-0 items-center justify-center bg-red-500/10 rounded-xl">
+                    <AlertTriangle className="text-red-500" size={18} />
+                  </div>
                   <div>
-                    <p className="font-semibold text-gray-800">{i.product?.name || 'Unknown'}</p>
-                    <p className="text-sm text-red-600">Reorder Level: {i.reorderLevel}</p>
+                    <p className="font-bold text-primary tracking-tight text-sm sm:text-base line-clamp-1 break-all pr-2">{i.product?.name || 'Unknown'}</p>
+                    <p className="text-[10px] font-bold text-red-600 uppercase">Limit: {i.reorderLevel}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-red-600 text-lg">{i.quantity}</p>
-                  <p className="text-xs text-red-500 mt-1 uppercase tracking-wide">Stock</p>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-black text-red-600 text-xl sm:text-2xl tracking-tighter">{i.quantity}</p>
+                  <p className="text-[10px] font-black text-red-600/70 uppercase">Left</p>
                 </div>
               </div>
             ))}
             {lowStock === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-green-600">
-                <CheckCircle size={32} className="mb-2" />
-                <p className="text-sm font-medium">All stock levels are optimal.</p>
+              <div className="flex-1 flex flex-col items-center justify-center opacity-60">
+                <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center mb-2">
+                  <CheckCircle size={24} className="text-primary/70" />
+                </div>
+                <p className="text-sm font-bold uppercase tracking-widest text-primary/70">Inventory Secured</p>
               </div>
             )}
           </div>
@@ -109,26 +145,37 @@ export default function ManagerDashboard() {
   );
 }
 
-function StatCard({ title, value, icon, alert }) {
+function StatCard({ title, value, suffix, icon, alert, trend }) {
   return (
-    <div className={`bg-surface p-6 rounded-xl shadow-sm border ${alert ? 'border-red-300' : 'border-gray-100'} flex items-center justify-between`}>
-      <div>
-        <p className="text-sm text-gray-500 font-medium mb-1">{title}</p>
-        <h4 className="text-2xl font-bold text-gray-800">{value}</h4>
+    <div className={`dash-card glass-card rounded-2xl p-4 h-[120px] flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg ${alert ? 'border-red-500/30' : ''}`}>
+      {trend === 'live' && (
+        <div className="absolute top-3 right-3 flex items-center gap-1">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-ping" />
+          <span className="text-[9px] font-bold text-green-700 uppercase tracking-widest hidden sm:inline-block">Live</span>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-colors duration-300 ${alert ? 'bg-red-500/10 text-red-600' : 'bg-primary/5 text-primary'}`}>
+          {icon}
+        </div>
+        <p className="text-[10px] sm:text-xs font-black uppercase text-primary/70 leading-tight line-clamp-2 pr-1">{title}</p>
       </div>
-      <div className={`p-3 rounded-lg ${alert ? 'bg-red-50' : 'bg-gray-50'}`}>
-        {icon}
+
+      <div className="flex items-end gap-1.5 mt-auto">
+        <h4 className={`text-2xl sm:text-3xl font-black tracking-tighter leading-none ${alert ? 'text-red-600' : 'text-primary'}`}>{value}</h4>
+        {suffix && <span className="text-[10px] font-bold text-primary/60 uppercase mb-0.5">{suffix}</span>}
       </div>
     </div>
   )
 }
 
-function getStatusColor(status) {
+function getStatusPulse(status) {
   switch (status) {
-    case 'pending': return 'bg-gray-200 text-gray-800';
-    case 'assigned': return 'bg-blue-100 text-blue-800';
-    case 'in-transit': return 'bg-yellow-100 text-yellow-800';
-    case 'delivered': return 'bg-green-100 text-green-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case 'pending': return 'bg-gray-400';
+    case 'assigned': return 'bg-blue-400';
+    case 'in-transit': return 'bg-yellow-400';
+    case 'delivered': return 'bg-green-400';
+    default: return 'bg-gray-200';
   }
 }

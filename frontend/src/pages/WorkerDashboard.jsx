@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
 import axios from 'axios';
-import { MapPin, Box, Check, Play, Navigation, AlertTriangle, Coffee } from 'lucide-react';
+import { io } from 'socket.io-client';
+import { Truck, MapPin, CheckCircle, Package, Clock, Phone, Navigation, AlertTriangle } from 'lucide-react';
+import gsap from 'gsap';
 import Modal from '../components/ui/Modal.jsx';
 
 export default function WorkerDashboard() {
-  const [orders, setOrders] = useState([]);
+  const [deliveries, setDeliveries] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isReportModalOpen, setReportModalOpen] = useState(false);
@@ -20,209 +21,207 @@ export default function WorkerDashboard() {
     const fetchData = async () => {
       try {
         const [ordersRes, invRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/orders'),
+          axios.get('http://localhost:5000/api/orders/my-deliveries'),
           axios.get('http://localhost:5000/api/inventory')
         ]);
-        
-        const availableOrMine = ordersRes.data.filter(o => 
-          o.deliveryStatus === 'pending' || 
-          (o.assignedWorker && o.assignedWorker._id === userId)
-        );
-        setOrders(availableOrMine);
+        setDeliveries(ordersRes.data);
         setInventory(invRes.data);
+        
+        // Staggered entrance
+        gsap.fromTo(".delivery-card", 
+          { y: 20, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.5, stagger: 0.1, ease: "power2.out" }
+        );
       } catch (err) {
-        console.error('Failed to load data', err);
+        console.error('Failed to fetch deliveries', err);
       }
     };
     fetchData();
 
     const socket = io('http://localhost:5000');
-    socket.on('connect', () => socket.emit('join_room', 'worker'));
-
-    socket.on('orderCreated', order => setOrders(prev => [order, ...prev]));
-    socket.on('workerAssigned', order => {
-      setOrders(prev => {
-        if (order.assignedWorker._id !== userId) return prev.filter(o => o._id !== order._id);
-        const exists = prev.find(o => o._id === order._id);
-        return exists ? prev.map(o => o._id === order._id ? order : o) : [order, ...prev];
-      });
+    socket.on('connect', () => {
+      const username = localStorage.getItem('username');
+      socket.emit('join_room', username);
     });
-    socket.on('deliveryStarted', order => setOrders(prev => prev.map(o => o._id === order._id ? order : o)));
-    socket.on('deliveryCompleted', order => setOrders(prev => prev.map(o => o._id === order._id ? order : o)));
-    socket.on('stockUpdated', inv => setInventory(prev => prev.map(o => o._id === inv._id ? inv : o)));
+
+    socket.on('orderAssigned', (order) => {
+      setDeliveries(prev => [...prev, order]);
+    });
 
     return () => socket.disconnect();
-  }, [userId]);
+  }, []);
 
-  const updateStatus = async (orderId, endpoint, payload) => {
+  const updateStatus = async (orderId, status) => {
     try {
-      await axios.put(`http://localhost:5000/api/orders/${orderId}/${endpoint}`, payload);
+      const res = await axios.patch(`http://localhost:5000/api/orders/${orderId}/status`, { status });
+      setDeliveries(prev => prev.map(o => o._id === orderId ? res.data : o));
     } catch (err) {
-      console.error('Update failed', err);
+      alert('Failed to update status');
     }
   };
 
   const handleReportMissing = async () => {
     if (!missingItemId) return;
     try {
-      // Set inventory of that item to 0 and notify manager
       await axios.put(`http://localhost:5000/api/inventory/${missingItemId}`, {
         quantity: 0
       });
       setReportModalOpen(false);
       setMissingItemId('');
-      alert("Item reported as missing. Manager Dashboard updated.");
+      alert("Item reported as missing. Manager notified.");
     } catch (err) {
       console.error('Failed to report missing stock', err);
     }
   };
 
-  const openReportModal = (order) => {
-    setSelectedOrder(order);
-    setReportModalOpen(true);
-  };
+  const activeDeliveries = deliveries.filter(d => d.deliveryStatus !== 'delivered');
 
   return (
-    <div className="max-w-md mx-auto space-y-6 pb-20">
-      {/* Mobile-Friendly Header Area */}
-      <div className="bg-surface p-5 rounded-2xl shadow-sm border border-gray-100 mb-6 flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">My Route</h2>
-          <p className="text-xs text-gray-500 mt-1">Manage your deliveries</p>
-        </div>
-        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
-          <Navigation className="text-primary" size={20} />
-        </div>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-8 pb-10">
+      <header className="delivery-card flex flex-col gap-2">
+        <h1 className="text-4xl font-black text-primary tracking-tight">Your Route</h1>
+        <p className="text-primary/40 font-medium">You have <span className="text-primary font-bold">{activeDeliveries.length} active</span> deliveries today.</p>
+      </header>
 
-      <div className="space-y-4">
-        {orders.map(o => (
-          <div key={o._id} className="bg-surface rounded-2xl shadow-md border border-gray-100 overflow-hidden flex flex-col">
-            
-            {/* Status Top Bar */}
-            <div className={`px-4 py-2 text-xs font-bold text-white flex justify-between items-center uppercase tracking-wider ${getTopBarColor(o.deliveryStatus)}`}>
-              <span>Status: {o.deliveryStatus}</span>
-              <span>#{o._id.slice(-5)}</span>
-            </div>
-
-            <div className="p-5 flex-1">
-              <h3 className="text-lg font-bold text-gray-800 mb-1">{o.customer?.name || 'Customer'}</h3>
+      <div className="space-y-6">
+        {activeDeliveries.length > 0 ? (
+          activeDeliveries.map((delivery) => (
+            <div key={delivery._id} className="delivery-card glass-card p-0 overflow-hidden relative group">
+              {/* Status Ribbon */}
+              <div className={`absolute top-0 left-0 w-2 h-full ${delivery.deliveryStatus === 'in-transit' ? 'bg-yellow-400' : 'bg-blue-400'}`} />
               
-              <div className="flex items-start gap-2 text-sm text-gray-600 mb-4 mt-2">
-                <MapPin className="text-primary shrink-0 mt-0.5" size={16} />
-                <span>
-                  {o.customer?.address?.street || 'No Street'}, {o.customer?.address?.city || 'No City'}
-                </span>
-              </div>
+              <div className="p-5 space-y-4">
+                <div className="flex justify-between items-start pl-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70">Order Reference</p>
+                    <h3 className="text-2xl font-black text-primary tracking-tighter">#{delivery._id.slice(-6).toUpperCase()}</h3>
+                  </div>
+                  <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${getStatusColor(delivery.deliveryStatus)}`}>
+                    {delivery.deliveryStatus}
+                  </span>
+                </div>
 
-              {/* Order Items List */}
-              <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 mb-4">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-1">
-                  <Box size={14} /> Items to Deliver
-                </p>
-                <ul className="space-y-2">
-                  {o.items?.map((itemLine, idx) => (
-                    <li key={idx} className="flex justify-between text-sm items-center">
-                      <span className="font-medium text-gray-700">
-                        <span className="text-primary mr-1">{itemLine.quantity}x</span> 
-                        {itemLine.product?.name || 'Unknown Item'}
-                      </span>
-                    </li>
-                  ))}
-                  {(!o.items || o.items.length === 0) && (
-                    <li className="text-sm text-gray-500">No items listed.</li>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-4 border-l border-black/5">
+                  <div className="flex items-start gap-3">
+                    <div className="p-3 bg-primary/5 rounded-2xl text-primary">
+                      <MapPin size={20} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-primary/70">Delivery Address</p>
+                      <p className="font-bold text-primary leading-tight mt-1">{delivery.customer?.address || 'No Address Provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-primary/5 rounded-2xl text-primary">
+                      <Phone size={20} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-primary/70">Customer</p>
+                      <p className="font-bold text-primary leading-tight mt-1">{delivery.customer?.name}</p>
+                      <span className="text-xs font-bold text-primary/60">{delivery.customer?.phone}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-primary/5 p-4 rounded-3xl space-y-3">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-primary/70 flex items-center gap-2">
+                      <Package size={14} /> Package Contents
+                    </p>
+                    <button 
+                      onClick={() => { setSelectedOrder(delivery); setReportModalOpen(true); }}
+                      className="text-[10px] font-black text-red-500 hover:text-red-600 flex items-center gap-1 uppercase"
+                    >
+                      <AlertTriangle size={12} /> Report Issue
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {delivery.items.map((item, idx) => (
+                      <div key={idx} className="bg-white/60 p-3 rounded-2xl flex items-center justify-between">
+                         <span className="text-xs font-bold text-primary truncate mr-2">{item.product?.name}</span>
+                         <span className="bg-primary text-secondary text-[10px] font-black px-2 py-0.5 rounded-full">x{item.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  {delivery.deliveryStatus === 'assigned' && (
+                    <button
+                      onClick={() => updateStatus(delivery._id, 'in-transit')}
+                      className="btn-primary flex-1 group"
+                    >
+                      <Navigation size={20} className="group-hover:rotate-12 transition-transform" /> START DELIVERY
+                    </button>
                   )}
-                </ul>
+                  {delivery.deliveryStatus === 'in-transit' && (
+                    <button
+                      onClick={() => updateStatus(delivery._id, 'delivered')}
+                      className="flex-1 bg-green-500 text-white px-6 py-4 rounded-2xl shadow-lg shadow-green-200 font-black hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 tracking-widest"
+                    >
+                      <CheckCircle size={20} /> MARK AS DELIVERED
+                    </button>
+                  )}
+                </div>
               </div>
-
             </div>
-
-            {/* Action Buttons Map explicitly to constraints: Preparing -> Out for Delivery -> Delivered */}
-            <div className="p-4 border-t border-gray-100 bg-white space-y-2">
-              {o.deliveryStatus === 'pending' && (
-                <button 
-                  onClick={() => updateStatus(o._id, 'assign', { workerId: userId })}
-                  className="w-full py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-xl font-bold transition-all"
-                >
-                  Accept Delivery
-                </button>
-              )}
-
-              {o.deliveryStatus === 'assigned' && o.assignedWorker?._id === userId && (
-                <button 
-                  onClick={() => updateStatus(o._id, 'status', { status: 'in-transit' })}
-                  className="w-full py-3 bg-secondary hover:bg-yellow-600 text-white rounded-xl font-bold transition-all shadow-md shadow-secondary/20 flex justify-center items-center gap-2"
-                >
-                  <Play size={18} fill="currentColor"/> Out for Delivery
-                </button>
-              )}
-
-              {o.deliveryStatus === 'in-transit' && o.assignedWorker?._id === userId && (
-                <button 
-                  onClick={() => updateStatus(o._id, 'status', { status: 'delivered' })}
-                  className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-all shadow-md shadow-green-600/20 flex justify-center items-center gap-2"
-                >
-                  <Check size={18} strokeWidth={3}/> Mark Delivered
-                </button>
-              )}
-
-              {/* Only show report missing if it hasn't been delivered perfectly yet */}
-              {['assigned', 'in-transit'].includes(o.deliveryStatus) && o.assignedWorker?._id === userId && (
-                <button 
-                  onClick={() => openReportModal(o)}
-                  className="w-full py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2"
-                >
-                  <AlertTriangle size={16} /> Report Missing Stock
-                </button>
-              )}
+          ))
+        ) : (
+          <div className="delivery-card glass-card p-16 text-center space-y-4">
+            <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto">
+              <Clock size={40} className="text-primary/20" />
             </div>
-          </div>
-        ))}
-
-        {orders.length === 0 && (
-          <div className="bg-surface p-10 rounded-2xl text-center shadow-sm border border-gray-100 flex flex-col items-center">
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-              <Coffee className="text-gray-400" size={28} />
-            </div>
-            <h3 className="text-lg font-bold text-gray-700">No active deliveries</h3>
-            <p className="text-sm text-gray-500 mt-1">Take a break, you're all caught up!</p>
+            <h3 className="text-xl font-black text-primary tracking-tight">All Caught Up!</h3>
+            <p className="text-primary/40 text-sm font-medium">No active deliveries assigned to you right now.</p>
           </div>
         )}
       </div>
 
+      {deliveries.filter(d => d.deliveryStatus === 'delivered').length > 0 && (
+         <div className="delivery-card pt-10 border-t border-black/5">
+            <h3 className="text-lg font-black text-primary/30 uppercase tracking-[0.2em] mb-6">Completed Deliveries</h3>
+            <div className="space-y-4 grayscale opacity-60">
+               {deliveries.filter(d => d.deliveryStatus === 'delivered').slice(0, 3).map(d => (
+                  <div key={d._id} className="glass-card p-6 flex justify-between items-center">
+                     <div>
+                        <p className="font-bold text-primary">#{d._id.slice(-6).toUpperCase()}</p>
+                        <p className="text-xs font-medium text-primary/40">{d.customer?.name}</p>
+                     </div>
+                     <CheckCircle className="text-green-500" size={24} />
+                  </div>
+               ))}
+            </div>
+         </div>
+      )}
+
       {/* Report Missing Stock Modal */}
-      <Modal isOpen={isReportModalOpen} onClose={() => setReportModalOpen(false)} title="Report Missing Item">
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500">
-            If an item is missing from this order, select it below. This will alert the manager and zero out the current inventory.
+      <Modal isOpen={isReportModalOpen} onClose={() => setReportModalOpen(false)} title="Report Issue">
+        <div className="space-y-6">
+          <p className="text-sm font-medium text-primary/60">
+            If an item is missing or damaged, please select it below. This will zero out the current inventory and alert the manager.
           </p>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Select Item</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Select Affected Item</label>
             <select 
               value={missingItemId}
               onChange={(e) => setMissingItemId(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl p-3 outline-none focus:ring-2 focus:ring-red-500 bg-gray-50"
+              className="w-full bg-primary/5 border border-black/5 rounded-2xl p-4 font-bold text-primary focus:ring-2 focus:ring-primary outline-none"
             >
-              <option value="" disabled>-- Choose Missing Item --</option>
-              {/* Only show items from this specific order */}
+              <option value="" disabled>-- Choose Item --</option>
               {selectedOrder?.items?.map((i, idx) => {
-                // Find inventory ID associated with this product to zero it out
                 const invRecord = inventory.find(inv => inv.product?._id === i.product?._id);
-                if (!invRecord) return null;
-                return (
-                  <option key={idx} value={invRecord._id}>
-                    {i.product?.name} (Qty requested: {i.quantity})
-                  </option>
-                )
+                return invRecord ? (
+                  <option key={idx} value={invRecord._id}>{i.product?.name} (Qty: {i.quantity})</option>
+                ) : null;
               })}
             </select>
           </div>
           <button 
             onClick={handleReportMissing}
             disabled={!missingItemId}
-            className="w-full mt-4 bg-red-500 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl hover:bg-red-600 transition"
+            className="w-full btn-primary !bg-red-500 !text-white hover:!bg-red-600 disabled:!bg-gray-200"
           >
-            Submit Report
+            SUBMIT LOG
           </button>
         </div>
       </Modal>
@@ -230,12 +229,11 @@ export default function WorkerDashboard() {
   );
 }
 
-function getTopBarColor(status) {
-  switch(status) {
-    case 'pending': return 'bg-gray-400';
-    case 'assigned': return 'bg-blue-500';
-    case 'in-transit': return 'bg-secondary';
-    case 'delivered': return 'bg-green-500';
-    default: return 'bg-gray-400';
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'assigned': return 'bg-blue-100 text-blue-600';
+    case 'in-transit': return 'bg-yellow-100 text-yellow-600';
+    case 'delivered': return 'bg-green-100 text-green-600';
+    default: return 'bg-gray-100 text-gray-500';
   }
-}
+};

@@ -1,30 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
-import { Search, Edit, Trash2, Plus, AlertTriangle } from 'lucide-react';
+import { Search, Edit, Trash2, Plus, AlertTriangle, Package, ChevronRight } from 'lucide-react';
 import Table from '../components/ui/Table.jsx';
 import Modal from '../components/ui/Modal.jsx';
+import gsap from 'gsap';
 
 export default function Inventory() {
   const [inventory, setInventory] = useState([]);
   const [search, setSearch] = useState('');
-  
-  // Modals state
   const [isUpdateModalOpen, setUpdateModalOpen] = useState(false);
   const [isAddModalOpen, setAddModalOpen] = useState(false);
-  
   const [selectedItem, setSelectedItem] = useState(null);
   const [newQuantity, setNewQuantity] = useState('');
-
-  // Add Product Form State
   const [newProduct, setNewProduct] = useState({
-    name: '',
-    description: '',
-    basePrice: '',
-    category: '',
-    quantity: '',
-    unit: 'pcs',
-    reorderLevel: 10
+    name: '', description: '', basePrice: '', category: '', quantity: '', unit: 'pcs', reorderLevel: 10
   });
 
   const fetchInventory = async () => {
@@ -33,6 +23,12 @@ export default function Inventory() {
     try {
       const res = await axios.get('http://localhost:5000/api/inventory');
       setInventory(res.data);
+      
+      // GSAP Animation
+      gsap.fromTo(".inv-animate", 
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.5, stagger: 0.05, ease: "power2.out" }
+      );
     } catch (error) {
       console.error("Failed to load inventory", error);
     }
@@ -40,12 +36,10 @@ export default function Inventory() {
 
   useEffect(() => {
     fetchInventory();
-
     const socket = io('http://localhost:5000');
     socket.on('stockUpdated', inv => {
       setInventory(prev => prev.map(o => o._id === inv._id ? inv : o));
     });
-
     return () => socket.disconnect();
   }, []);
 
@@ -83,178 +77,191 @@ export default function Inventory() {
       setNewProduct({
         name: '', description: '', basePrice: '', category: '', quantity: '', unit: 'pcs', reorderLevel: 10
       });
-      fetchInventory(); // Refresh list to get new product's inventory record
+      fetchInventory();
     } catch (err) {
       console.error('Failed to add product', err);
-      alert('Error adding product.');
     }
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (!window.confirm("Are you sure you want to delete this product? This action cannot be undone.")) return;
+    if (!window.confirm("Are you sure?")) return;
     try {
       await axios.delete(`http://localhost:5000/api/products/${productId}`);
       fetchInventory();
     } catch (err) {
       console.error("Failed to delete", err);
-      alert('Error deleting product.');
     }
   };
 
   const columns = [
-    { header: 'Product Name', render: (r) => <span className="font-semibold text-gray-800">{r.product?.name || 'Unknown'}</span> },
-    { header: 'Category', render: (r) => <span className="text-sm text-gray-500">{r.product?.category || 'N/A'}</span> },
-    { header: 'Price', render: (r) => <span className="text-sm text-gray-500">${r.product?.basePrice?.toFixed(2) || '0.00'}</span> },
-    { header: 'In Stock', align: 'center', render: (r) => {
+    { 
+      header: 'Product', 
+      render: (r) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary/5 rounded-xl flex items-center justify-center text-primary">
+            <Package size={18} />
+          </div>
+          <div>
+            <p className="font-black text-primary tracking-tight">{r.product?.name || 'Unknown'}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary/30">{r.product?.category || 'General'}</p>
+          </div>
+        </div>
+      )
+    },
+    { header: 'Price', render: (r) => <span className="font-bold text-primary/60">${r.product?.basePrice?.toFixed(2)}</span> },
+    { 
+      header: 'Availability', 
+      align: 'center', 
+      render: (r) => {
         const isLow = r.quantity <= r.reorderLevel;
-        return <span className={`font-bold ${isLow ? 'text-red-500' : 'text-gray-800'}`}>{r.quantity} {r.unit}</span>
-    }},
-    { header: 'Reorder Level', align: 'center', render: (r) => <span className="text-gray-500">{r.reorderLevel}</span> },
-    { header: 'Actions', align: 'right', render: (r) => (
-      <div className="flex justify-end gap-2">
-        <button 
-          onClick={() => openUpdateModal(r)}
-          className="text-primary hover:bg-primary/10 p-2 rounded transition-colors inline-block"
-          title="Update Stock"
-        >
-          <Edit size={16} />
-        </button>
-        <button 
-          onClick={() => handleDeleteProduct(r.product?._id)}
-          className="text-red-500 hover:bg-red-50 p-2 rounded transition-colors inline-block"
-          title="Delete Product"
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
-    )}
+        return (
+          <div className="flex flex-col items-center">
+            <span className={`text-lg font-black tracking-tighter ${isLow ? 'text-red-500 underline decoration-2 underline-offset-4' : 'text-primary'}`}>
+              {r.quantity}
+            </span>
+            <span className="text-[10px] font-black uppercase text-primary/20">{r.unit}</span>
+          </div>
+        )
+      }
+    },
+    { 
+      header: 'Actions', 
+      align: 'right', 
+      render: (r) => (
+        <div className="flex justify-end gap-2">
+          <button 
+            onClick={() => openUpdateModal(r)}
+            className="p-3 bg-primary/5 text-primary rounded-2xl hover:bg-primary hover:text-secondary transition-all active:scale-90"
+          >
+            <Edit size={16} />
+          </button>
+          <button 
+            onClick={() => handleDeleteProduct(r.product?._id)}
+            className="p-3 bg-red-500/5 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-90"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      )
+    }
   ];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-10">
-
-      {/* Low Stock Alerts */}
+    <div className="space-y-8 pb-10">
+      {/* Alerts */}
       {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm">
-          <div className="flex items-start">
-            <AlertTriangle className="text-red-500 mr-3 mt-0.5" size={24} />
-            <div>
-              <h3 className="text-red-800 font-bold text-lg mb-1">Stock Alerts</h3>
-              <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
-                {outOfStockItems.map(i => (
-                  <li key={i._id} className="font-bold">OUT OF STOCK: {i.product?.name || 'Unknown item'}</li>
-                ))}
-                {lowStockItems.map(i => (
-                  <li key={i._id}>Low stock: {i.product?.name || 'Unknown item'} ({i.quantity} left)</li>
-                ))}
-              </ul>
-            </div>
+        <div className="inv-animate glass-card !border-red-500/20 !bg-red-500/5 p-6 flex items-start gap-4">
+          <div className="p-3 bg-red-500/10 rounded-2xl text-red-500">
+            <AlertTriangle size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-red-600 tracking-tight">Supply Chain Warning</h3>
+            <p className="text-red-600/60 text-sm font-medium">Multiple items have reached critical thresholds.</p>
           </div>
         </div>
       )}
 
-      {/* Header & Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-surface p-6 rounded-xl shadow-sm border border-gray-100 gap-4">
+      {/* Hero / Filters */}
+      <div className="inv-animate flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Inventory Management</h2>
-          <p className="text-sm text-gray-500 mt-1">Track, filter, and adjust warehouse stock instantly.</p>
+          <h1 className="text-4xl font-black text-primary tracking-tight">Inventory</h1>
+          <p className="text-primary/40 font-medium">Real-time stock management & logistics.</p>
         </div>
-        <div className="flex w-full md:w-auto gap-4">
-          <div className="relative flex-1 md:flex-none">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+        
+        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/30" size={18} />
             <input 
               type="text" 
-              placeholder="Search items..." 
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+              placeholder="Search assets..." 
+              className="w-full pl-12 pr-4 py-4 bg-white/50 border border-black/5 rounded-[2rem] focus:ring-2 focus:ring-primary outline-none font-bold text-primary placeholder:text-primary/20"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <button 
             onClick={() => setAddModalOpen(true)}
-            className="flex items-center gap-2 bg-primary hover:bg-olive-dark text-white font-bold py-2 px-4 rounded-lg transition-colors border-2 border-primary hover:border-olive-dark whitespace-nowrap"
+            className="btn-primary"
           >
-            <Plus size={18} /> Add Product
+            <Plus size={20} /> NEW PRODUCT
           </button>
         </div>
       </div>
 
-      <Table columns={columns} data={filtered} emptyMessage="No matching inventory found." />
+      {/* Table */}
+      <div className="inv-animate">
+        <Table columns={columns} data={filtered} emptyMessage="No matching inventory found." />
+      </div>
 
       {/* Update Stock Modal */}
-      <Modal isOpen={isUpdateModalOpen} onClose={() => setUpdateModalOpen(false)} title="Update Stock Quantity">
+      <Modal isOpen={isUpdateModalOpen} onClose={() => setUpdateModalOpen(false)} title="Adjust Stock">
         {selectedItem && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-500">
-              Editing stock for: <strong className="text-gray-800">{selectedItem.product?.name}</strong>
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">New Quantity</label>
+          <div className="space-y-6">
+            <div className="p-6 bg-primary/5 rounded-[2rem] border border-black/5">
+               <p className="text-[10px] font-black uppercase text-primary/30 tracking-widest mb-1">Editing Resource</p>
+               <h4 className="text-xl font-black text-primary tracking-tight">{selectedItem.product?.name}</h4>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 pl-4">Physical Count</label>
               <input 
                 type="number" 
                 value={newQuantity}
                 onChange={(e) => setNewQuantity(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-primary/5 border border-black/5 rounded-[2rem] p-5 font-black text-3xl tracking-tighter text-primary outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <button 
               onClick={handleUpdateStock}
-              className="w-full mt-4 bg-primary text-white font-bold py-2.5 rounded-lg hover:bg-olive-dark transition"
+              className="btn-primary w-full py-5 text-lg"
             >
-              Confirm Update
+              UPDATE QUANTITY
             </button>
           </div>
         )}
       </Modal>
 
       {/* Add Product Modal */}
-      <Modal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} title="Add New Product">
-        <form onSubmit={handleAddProduct} className="space-y-4">
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-1">Product Name</label>
-              <input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Organic Bananas" />
+      <Modal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} title="Onboard Product">
+        <form onSubmit={handleAddProduct} className="space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 ml-4">Product Name</label>
+              <input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full bg-primary/5 border border-black/5 rounded-2xl p-4 font-bold text-primary outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Sourdough Loaf" />
             </div>
 
-            <div className="col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
-              <textarea value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary h-20" placeholder="Product details..."></textarea>
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 ml-4">Category</label>
+                  <input required type="text" value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full bg-primary/5 border border-black/5 rounded-2xl p-4 font-bold text-primary outline-none focus:ring-2 focus:ring-primary" placeholder="Breads" />
+               </div>
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 ml-4">Price ($)</label>
+                  <input required type="number" step="0.01" value={newProduct.basePrice} onChange={e => setNewProduct({...newProduct, basePrice: e.target.value})} className="w-full bg-primary/5 border border-black/5 rounded-2xl p-4 font-bold text-primary outline-none focus:ring-2 focus:ring-primary" placeholder="0.00" />
+               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Category</label>
-              <input required type="text" value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Produce" />
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 ml-4">Initial Qty</label>
+                  <input required type="number" value={newProduct.quantity} onChange={e => setNewProduct({...newProduct, quantity: e.target.value})} className="w-full bg-primary/5 border border-black/5 rounded-2xl p-4 font-bold text-primary outline-none focus:ring-2 focus:ring-primary" placeholder="0" />
+               </div>
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 ml-4">Unit</label>
+                  <input required type="text" value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full bg-primary/5 border border-black/5 rounded-2xl p-4 font-bold text-primary outline-none focus:ring-2 focus:ring-primary" placeholder="pcs" />
+               </div>
             </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Base Price ($)</label>
-              <input required type="number" step="0.01" min="0" value={newProduct.basePrice} onChange={e => setNewProduct({...newProduct, basePrice: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary" placeholder="0.00" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Initial Quantity</label>
-              <input required type="number" min="0" value={newProduct.quantity} onChange={e => setNewProduct({...newProduct, quantity: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary" placeholder="100" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Unit</label>
-              <input required type="text" value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary" placeholder="pcs, kg, lbs..." />
-            </div>
-
-            <div className="col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-1">Reorder Level Alert Threshold</label>
-              <input required type="number" min="0" value={newProduct.reorderLevel} onChange={e => setNewProduct({...newProduct, reorderLevel: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary" placeholder="10" />
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 ml-4">Low Stock Warning Threshold</label>
+              <input required type="number" value={newProduct.reorderLevel} onChange={e => setNewProduct({...newProduct, reorderLevel: e.target.value})} className="w-full bg-primary/5 border border-black/5 rounded-2xl p-4 font-bold text-primary outline-none focus:ring-2 focus:ring-primary" />
             </div>
           </div>
 
-          <div className="flex gap-4 pt-4 border-t border-gray-100 mt-6">
-            <button type="button" onClick={() => setAddModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition">Cancel</button>
-            <button type="submit" className="flex-1 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-olive-dark transition">Save Product</button>
+          <div className="flex gap-4 pt-4">
+            <button type="submit" className="flex-1 btn-primary py-5">REGISTER PRODUCT</button>
           </div>
         </form>
       </Modal>
-
     </div>
   );
-}
+}

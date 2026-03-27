@@ -9,7 +9,7 @@ node_modules/
 # Production
 /build
 /dist
-/.vite
+.vite
 
 # Environment variables
 .env
