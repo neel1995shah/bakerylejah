@@ -5,6 +5,7 @@ import { ShoppingCart, Plus, Minus, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Table from '../components/ui/Table.jsx';
 import Modal from '../components/ui/Modal.jsx';
+import ToastContainer from '../components/ui/ToastContainer.jsx';
 import gsap from 'gsap';
 
 export default function Orders() {
@@ -12,6 +13,7 @@ export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [inventory, setInventory] = useState([]);
+  const [toasts, setToasts] = useState([]);
 
   const [isPOSModalOpen, setPOSModalOpen] = useState(false);
   const [deliverySelections, setDeliverySelections] = useState({});
@@ -29,6 +31,15 @@ export default function Orders() {
     phone: '',
     address: ''
   });
+
+  const addToast = (type, message, title, details) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, message, title, details, duration: 6000 }]);
+  };
+
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -83,7 +94,11 @@ export default function Orders() {
       if (role) socket.emit('join_room', role);
       socket.emit('join_room', 'manager');
     });
-    socket.on('orderCreated', o => setOrders(prev => [o, ...prev]));
+    socket.on('orderCreated', o => {
+      setOrders(prev => [o, ...prev]);
+      const itemsText = o.items?.map(i => `${i.quantity} ${i.unitType} of ${i.productName}`).join(', ') || 'items';
+      addToast('order', `New order #${o._id.slice(-6).toUpperCase()} received`, 'New Order', `Customer: ${o.customer?.name || 'Walk-in'}\n${itemsText}\nTotal: $${o.totalAmount?.toFixed(2)}`);
+    });
     socket.on('workerAssigned', o => setOrders(prev => prev.map(old => old._id === o._id ? o : old)));
     socket.on('orderConfirmed', o => setOrders(prev => prev.map(old => old._id === o._id ? o : old)));
     socket.on('orderCancelled', o => setOrders(prev => prev.map(old => old._id === o._id ? o : old)));
@@ -147,6 +162,16 @@ export default function Orders() {
       alert('Issue sent to owners and sub-managers.');
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to raise issue');
+    }
+  };
+
+  const handleMarkDelivered = async (orderId) => {
+    try {
+      const res = await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, { status: 'delivered' });
+      setOrders(prev => prev.map(old => old._id === orderId ? res.data : old));
+      addToast('success', `Order #${orderId.slice(-6).toUpperCase()} marked as delivered`, 'Order Completed');
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to mark order as delivered');
     }
   };
 
@@ -359,10 +384,12 @@ export default function Orders() {
       align: 'center',
       render: (r) => {
         const isFinalState = ['cancelled', 'delivered'].includes(r.deliveryStatus);
+        const isPending = r.deliveryStatus === 'pending';
+        const isAssigned = r.deliveryStatus === 'assigned';
 
         return (
           <div className="flex flex-col gap-2 items-center">
-            {!isFinalState && (
+            {isPending && (
               <select
                 value={deliverySelections[r._id] || ''}
                 onChange={(e) => handleDeliverySelection(r._id, e.target.value)}
@@ -376,28 +403,41 @@ export default function Orders() {
               </select>
             )}
 
-            <div className="flex gap-1.5">
-              <button
-                onClick={() => handleConfirmOrder(r._id)}
-                disabled={isFinalState}
-                className="px-2 py-1 rounded-lg bg-green-500 text-white text-[10px] font-black uppercase tracking-wider disabled:opacity-40"
-              >
-                Confirm
-              </button>
-              <button
-                onClick={() => handleCancelOrder(r._id)}
-                disabled={isFinalState}
-                className="px-2 py-1 rounded-lg bg-red-500 text-white text-[10px] font-black uppercase tracking-wider disabled:opacity-40"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleIssueOrder(r._id)}
-                disabled={isFinalState}
-                className="px-2 py-1 rounded-lg bg-yellow-400 text-primary text-[10px] font-black uppercase tracking-wider disabled:opacity-40"
-              >
-                Issue
-              </button>
+            <div className="flex gap-1.5 flex-wrap justify-center">
+              {isPending && (
+                <>
+                  <button
+                    onClick={() => handleConfirmOrder(r._id)}
+                    className="px-2 py-1 rounded-lg bg-green-500 text-white text-[10px] font-black uppercase tracking-wider hover:bg-green-600"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => handleCancelOrder(r._id)}
+                    className="px-2 py-1 rounded-lg bg-red-500 text-white text-[10px] font-black uppercase tracking-wider hover:bg-red-600"
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
+
+              {isAssigned && (
+                <button
+                  onClick={() => handleMarkDelivered(r._id)}
+                  className="px-2 py-1 rounded-lg bg-blue-500 text-white text-[10px] font-black uppercase tracking-wider hover:bg-blue-600"
+                >
+                  Mark Delivered
+                </button>
+              )}
+
+              {!isFinalState && (
+                <button
+                  onClick={() => handleIssueOrder(r._id)}
+                  className="px-2 py-1 rounded-lg bg-yellow-400 text-primary text-[10px] font-black uppercase tracking-wider hover:bg-yellow-500"
+                >
+                  Issue
+                </button>
+              )}
             </div>
           </div>
         )
@@ -408,6 +448,8 @@ export default function Orders() {
 
   return (
     <div className="space-y-8 pb-10">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      
       <div className="order-animate flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-4xl font-black text-primary tracking-tight">Order Flows</h1>
