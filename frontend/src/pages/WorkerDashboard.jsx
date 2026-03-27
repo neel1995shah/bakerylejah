@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import { SOCKET_ORIGIN } from '../config/runtime.js';
 import { Truck, MapPin, CheckCircle, Package, Clock, Phone, Navigation, AlertTriangle } from 'lucide-react';
 import gsap from 'gsap';
 import Modal from '../components/ui/Modal.jsx';
@@ -38,7 +39,7 @@ export default function WorkerDashboard() {
     };
     fetchData();
 
-    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
+    const socket = io(SOCKET_ORIGIN);
     socket.on('connect', () => {
       const username = localStorage.getItem('username');
       socket.emit('join_room', username);

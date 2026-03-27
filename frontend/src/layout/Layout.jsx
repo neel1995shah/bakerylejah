@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import { SOCKET_ORIGIN } from '../config/runtime.js';
 import { Store, LayoutDashboard, ShoppingCart, Package, Users, LogOut, Truck, ChevronRight, Bell, ClipboardList, NotebookPen } from 'lucide-react';
 import brandLogo from '../assets/logo.svg';
 
@@ -74,7 +75,7 @@ export default function Layout() {
   }, [notifications]);
 
   useEffect(() => {
-    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
+    const socket = io(SOCKET_ORIGIN);
 
     socket.on('connect', () => {
       if (role) socket.emit('join_room', role);

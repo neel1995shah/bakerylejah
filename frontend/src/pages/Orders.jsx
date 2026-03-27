@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import Table from '../components/ui/Table.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import ToastContainer from '../components/ui/ToastContainer.jsx';
+import { SOCKET_ORIGIN } from '../config/runtime.js';
 import gsap from 'gsap';
 
 export default function Orders() {
@@ -89,7 +90,7 @@ export default function Orders() {
     };
     fetchData();
 
-    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
+    const socket = io(SOCKET_ORIGIN);
     socket.on('connect', () => {
       if (role) socket.emit('join_room', role);
       socket.emit('join_room', 'manager');

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
+import { SOCKET_ORIGIN } from '../config/runtime.js';
 
 export default function ManagerDashboard() {
   const [orders, setOrders] = useState([]);
@@ -27,7 +28,7 @@ export default function ManagerDashboard() {
     fetchDashboardData();
 
     // Socket Initialization
-    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
+    const socket = io(SOCKET_ORIGIN);
     
     socket.on('connect', () => {
       socket.emit('join_room', 'manager');

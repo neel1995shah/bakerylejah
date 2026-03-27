@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "echo Backend build step complete",
+    "build": "npm install --omit=dev && echo Backend build step complete",
     "dev": "nodemon index.js",
     "start": "node index.js"
   },

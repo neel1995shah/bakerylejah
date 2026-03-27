@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import { SOCKET_ORIGIN } from '../config/runtime.js';
 import { Search, Plus, Eye, Heart, IndianRupee, Package } from 'lucide-react';
 import Modal from '../components/ui/Modal.jsx';
 import gsap from 'gsap';
@@ -45,7 +46,7 @@ export default function Inventory() {
   useEffect(() => {
     fetchInventory();
 
-    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
+    const socket = io(SOCKET_ORIGIN);
     socket.on('stockUpdated', (inv) => {
       setInventory((prev) => prev.map((i) => (i._id === inv._id ? inv : i)));
     });

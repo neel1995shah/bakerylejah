@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
+import { SOCKET_ORIGIN } from '../config/runtime.js';
 import { Package, TrendingUp, AlertTriangle, CheckCircle, Truck, ArrowRight } from 'lucide-react';
 import gsap from 'gsap';
 
@@ -27,7 +28,7 @@ export default function ManagerDashboard() {
     };
     fetchData();
 
-    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
+    const socket = io(SOCKET_ORIGIN);
     socket.on('connect', () => socket.emit('join_room', 'manager'));
     socket.on('orderCreated', o => setOrders(prev => [...prev, o]));
     socket.on('workerAssigned', o => setOrders(prev => prev.map(old => old._id === o._id ? o : old)));
