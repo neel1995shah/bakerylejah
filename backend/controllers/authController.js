@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 
 export const registerUser = async (req, res) => {
-  const { username, password, role } = req.body;
+  const { name, username, password, role } = req.body;
 
   try {
     const userExists = await User.findOne({ username });
@@ -14,7 +14,7 @@ export const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await User.create({ username, password: hashedPassword, role });
+    const user = await User.create({ name, username, password: hashedPassword, role });
 
     res.status(201).json({
       _id: user._id,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Store } from 'lucide-react';
+import { ShieldCheck, Sparkles } from 'lucide-react';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -33,56 +33,69 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4">
-      <div className="max-w-md w-full bg-surface rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-        <div className="bg-primary p-8 text-center">
-          <div className="inline-block p-4 bg-secondary rounded-full mb-4 shadow-lg">
-            <Store size={40} className="text-white" />
+    <div className="relative min-h-screen flex flex-col justify-center items-center p-4 md:p-8 overflow-hidden">
+      <div className="orb orb--one" aria-hidden="true" />
+      <div className="orb orb--two" aria-hidden="true" />
+
+      <div className="glass relative max-w-md w-full rounded-3xl overflow-hidden p-1">
+        <div className="rounded-[22px] bg-white/10">
+          <div className="p-8 text-center border-b border-white/15">
+            <div className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-white/15 border border-white/30 mb-5 text-white/90 text-sm tracking-wide">
+              <Sparkles size={16} />
+              Secure Access Portal
+            </div>
+            <div className="inline-flex p-4 rounded-2xl mb-4 bg-white/20 border border-white/35 shadow-lg shadow-black/20">
+              <ShieldCheck size={34} className="text-white" />
+            </div>
+            <h2 className="text-3xl font-bold tracking-tight text-white">FreshMarket Control Deck</h2>
+            <p className="text-white/75 mt-2">Manager and staff authentication</p>
           </div>
-          <h2 className="text-3xl font-bold text-white tracking-tight">FreshMarket POS</h2>
-          <p className="text-primary-100 mt-2 text-white/80">Staff Portal Gateway</p>
-        </div>
-        
-        <div className="p-8">
+
+          <div className="p-8">
           {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-6 border border-red-200">
+            <div className="bg-red-500/15 text-red-100 p-3 rounded-xl text-sm mb-6 border border-red-300/35">
               {error}
             </div>
           )}
-          
+
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-              <input 
-                type="text" 
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-colors outline-none"
-                placeholder="Enter worker or manager ID" 
-                value={username} 
-                onChange={e=>setUsername(e.target.value)} 
-                required 
+              <label className="block text-sm font-medium text-white/80 mb-2">Username</label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/25 text-white placeholder:text-white/45 focus:ring-2 focus:ring-cyan-300/70 focus:border-cyan-200 transition-colors outline-none"
+                placeholder="Enter manager or worker ID"
+                value={username}
+                onChange={e=>setUsername(e.target.value)}
+                required
               />
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-              <input 
-                type="password" 
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-colors outline-none"
-                placeholder="••••••••" 
-                value={password} 
-                onChange={e=>setPassword(e.target.value)} 
-                required 
+              <label className="block text-sm font-medium text-white/80 mb-2">Password</label>
+              <input
+                type="password"
+                className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/25 text-white placeholder:text-white/45 focus:ring-2 focus:ring-cyan-300/70 focus:border-cyan-200 transition-colors outline-none"
+                placeholder="********"
+                value={password}
+                onChange={e=>setPassword(e.target.value)}
+                required
               />
             </div>
-            
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               disabled={loading}
-              className="w-full bg-secondary hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all duration-200 transform hover:-translate-y-0.5"
+              className="w-full py-3 px-4 rounded-xl font-semibold bg-gradient-to-r from-cyan-300 to-emerald-300 text-slate-900 shadow-lg shadow-cyan-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? 'Authenticating...' : 'Sign In'}
             </button>
+
+            <p className="text-xs text-white/60 text-center pt-1">
+              Protected session. Unauthorized access is logged.
+            </p>
           </form>
+          </div>
         </div>
       </div>
     </div>

@@ -3,7 +3,70 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-deep: #081626;
+    --bg-mid: #0f2f46;
+    --bg-light: #2e6f88;
+    --glass-fill: rgba(255, 255, 255, 0.12);
+    --glass-border: rgba(255, 255, 255, 0.28);
+    --ink: #eef8ff;
+    --ink-dim: rgba(238, 248, 255, 0.75);
+    --signal: #ffd166;
+  }
+
   body {
-    @apply bg-background text-gray-800 font-sans;
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: "Space Grotesk", "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(89, 172, 206, 0.45), transparent 30%),
+      radial-gradient(circle at 85% 15%, rgba(135, 92, 255, 0.28), transparent 33%),
+      radial-gradient(circle at 35% 80%, rgba(39, 219, 180, 0.2), transparent 32%),
+      linear-gradient(145deg, var(--bg-deep), var(--bg-mid) 48%, var(--bg-light));
+    background-attachment: fixed;
+  }
+}
+
+.glass {
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(16px) saturate(125%);
+}
+
+.orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(1px);
+  animation: drift 9s ease-in-out infinite;
+}
+
+.orb--one {
+  width: 240px;
+  height: 240px;
+  left: -60px;
+  top: -40px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 209, 102, 0.95), rgba(255, 209, 102, 0.15));
+}
+
+.orb--two {
+  width: 320px;
+  height: 320px;
+  right: -80px;
+  bottom: -90px;
+  background: radial-gradient(circle at 40% 35%, rgba(94, 234, 212, 0.8), rgba(94, 234, 212, 0.08));
+  animation-delay: 1.7s;
+}
+
+@keyframes drift {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+  100% {
+    transform: translateY(0px);
   }
 }
