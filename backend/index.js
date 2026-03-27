@@ -28,18 +28,27 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = [
+const envOrigins = [
   process.env.FRONTEND_URL,
+  ...(process.env.FRONTEND_URLS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+];
+
+const allowedOrigins = [
+  ...envOrigins,
   'http://localhost:5173',
-  'http://127.0.0.1:5173'
-].filter(Boolean);
+  'http://127.0.0.1:5173',
+  'https://bakerylejah.vercel.app'
+];
 
 const corsOptions = {
   origin(origin, callback) {
     // Allow non-browser clients and same-origin requests without an Origin header.
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
