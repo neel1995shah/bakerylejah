@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
+import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import connectDB from './config/db.js';
 
@@ -14,10 +15,12 @@ import inventoryRoutes from './routes/inventoryRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
 import supplierRoutes from './routes/supplierRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import stockAlertRoutes from './routes/stockAlertRoutes.js';
+import customerNeedRoutes from './routes/customerNeedRoutes.js';
 
 import { initSockets } from './sockets/index.js';
 
-dotenv.config();
+dotenv.config({ path: fileURLToPath(new URL('./.env', import.meta.url)) });
 
 // Connect Database
 connectDB();
@@ -50,6 +53,8 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/stock-alerts', stockAlertRoutes);
+app.use('/api/customer-needs', customerNeedRoutes);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server started on port ${PORT}`));

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { Store, LayoutDashboard, ShoppingCart, Package, Users, LogOut, Truck, ChevronRight } from 'lucide-react';
+import { io } from 'socket.io-client';
+import { Store, LayoutDashboard, ShoppingCart, Package, Users, LogOut, Truck, ChevronRight, Bell, ClipboardList, NotebookPen } from 'lucide-react';
 import brandLogo from '../assets/logo.svg';
 
 export default function Layout() {
@@ -8,12 +9,38 @@ export default function Layout() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const stored = localStorage.getItem('notifications');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   
   const navigate = useNavigate();
   const location = useLocation();
   const role = localStorage.getItem('role') || 'worker';
   const isAdmin = ['owner', 'sub_manager', 'manager'].includes(role);
   const username = localStorage.getItem('username') || 'User';
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const pushNotification = (next) => {
+    setNotifications((prev) => [{
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      read: false,
+      createdAt: new Date().toISOString(),
+      ...next
+    }, ...prev].slice(0, 100));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -25,16 +52,100 @@ export default function Layout() {
          { path: '/manager', label: 'Dashboard', icon: <LayoutDashboard size={24} /> },
          { path: '/orders', label: 'Orders', icon: <ShoppingCart size={24} /> },
          { path: '/inventory', label: 'Inventory', icon: <Package size={24} /> },
+         { path: '/stock-registration', label: 'Stock Registration', icon: <ClipboardList size={24} /> },
+         { path: '/customer-need', label: 'Customer Need', icon: <NotebookPen size={24} /> },
          { path: '/customers', label: 'Customers', icon: <Users size={24} /> },
+         { path: '/notifications', label: 'Notifications', icon: <Bell size={24} /> },
        ]
      : [
          { path: '/worker', label: 'Deliveries', icon: <Truck size={24} /> },
+         { path: '/stock-registration', label: 'Stock Registration', icon: <ClipboardList size={24} /> },
+         { path: '/customer-need', label: 'Customer Need', icon: <NotebookPen size={24} /> },
+         { path: '/notifications', label: 'Notifications', icon: <Bell size={24} /> },
        ];
 
   // Close mobile sidebar on navigation
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    localStorage.setItem('notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    const socket = io('http://localhost:5000');
+
+    socket.on('connect', () => {
+      if (role) socket.emit('join_room', role);
+      if (isAdmin) socket.emit('join_room', 'manager');
+    });
+
+    socket.on('orderCreated', (order) => {
+      pushNotification({
+        type: 'order',
+        title: 'New order created',
+        message: `${order?.customer?.name || 'Walk-in'} placed an order.`,
+        meta: order?._id ? `#${order._id.slice(-6).toUpperCase()}` : ''
+      });
+    });
+
+    socket.on('inventoryItemCreated', (item) => {
+      pushNotification({
+        type: 'inventory',
+        title: 'New inventory item',
+        message: `${item?.productName || 'Item'} was added to inventory.`,
+        meta: item?.quantity != null ? `${item.quantity} ${item.unit || ''}`.trim() : ''
+      });
+    });
+
+    socket.on('stockUpdated', (item) => {
+      pushNotification({
+        type: 'stock',
+        title: 'Inventory updated',
+        message: `${item?.product?.name || 'Item'} stock changed.`,
+        meta: item?.quantity != null ? `Qty: ${item.quantity}` : ''
+      });
+    });
+
+    socket.on('stockAlertCreated', (alert) => {
+      pushNotification({
+        type: 'stock-alert',
+        title: 'New stock alert registered',
+        message: `${alert?.itemName || 'Item'} requires stock attention.`,
+        meta: (alert?.priority || 'medium').toUpperCase()
+      });
+    });
+
+    socket.on('stockAlertCompleted', (alert) => {
+      pushNotification({
+        type: 'stock-alert',
+        title: 'Stock alert completed',
+        message: `${alert?.itemName || 'Item'} alert marked completed.`,
+        meta: alert?.completedBy?.username ? `By ${alert.completedBy.username}` : ''
+      });
+    });
+
+    socket.on('customerNeedCreated', (need) => {
+      pushNotification({
+        type: 'customer-need',
+        title: 'New customer need registered',
+        message: `${need?.customerName || 'Customer'} requested: ${need?.requirement || 'Need'}`,
+        meta: need?.customerPhone || ''
+      });
+    });
+
+    socket.on('customerNeedDone', (need) => {
+      pushNotification({
+        type: 'customer-need',
+        title: 'Customer need completed',
+        message: `${need?.customerName || 'Customer'} need marked done.`,
+        meta: need?.doneBy?.username ? `By ${need.doneBy.username}` : ''
+      });
+    });
+
+    return () => socket.disconnect();
+  }, [role, isAdmin]);
 
   return (
     <div className="flex h-screen bg-[#F9F6F0] overflow-hidden font-sans">
@@ -83,6 +194,11 @@ export default function Layout() {
                   {item.icon}
                 </span>
                 {!isCollapsed && <span className="text-lg whitespace-nowrap">{item.label}</span>}
+                {item.path === '/notifications' && unreadCount > 0 && (
+                  <span className="ml-auto min-w-[22px] h-[22px] px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -151,7 +267,7 @@ export default function Layout() {
         {/* Dynamic Content Area */}
         <div className="flex-1 overflow-auto p-4 lg:p-10 pb-32 lg:pb-10 relative">
           <div className="max-w-[1600px] mx-auto">
-            <Outlet />
+            <Outlet context={{ notifications, unreadCount, markAllAsRead, clearNotifications }} />
           </div>
         </div>
 
@@ -168,6 +284,11 @@ export default function Layout() {
                  `}
                >
                  {item.icon}
+                 {item.path === '/notifications' && unreadCount > 0 && (
+                   <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white text-[8px] font-black flex items-center justify-center">
+                     {unreadCount > 9 ? '9+' : unreadCount}
+                   </span>
+                 )}
                  {/* Active Indicator Dot */}
                  <span className={`absolute -bottom-1 w-1 h-1 rounded-full transition-all duration-300 ${isActive ? 'bg-secondary scale-100' : 'bg-transparent scale-0'}`} />
                </Link>

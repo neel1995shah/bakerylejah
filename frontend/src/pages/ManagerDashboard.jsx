@@ -48,9 +48,35 @@ export default function ManagerDashboard() {
     );
   }, [orders.length, inventory.length]);
 
-  const totalDues = orders.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
   const activeOrders = orders.filter(o => o.deliveryStatus !== 'delivered').length;
   const lowStock = inventory.filter(i => i.quantity <= i.reorderLevel).length;
+  const completedOrders = orders.filter((o) => o.deliveryStatus === 'delivered');
+  const completedCount = completedOrders.length;
+
+  const hourBuckets = Array.from({ length: 24 }, () => 0);
+  orders.forEach((o) => {
+    const d = new Date(o.createdAt);
+    if (!Number.isNaN(d.getTime())) {
+      hourBuckets[d.getHours()] += 1;
+    }
+  });
+  const peakHour = hourBuckets.reduce((best, count, idx, arr) => (count > arr[best] ? idx : best), 0);
+  const peakHourOrders = hourBuckets[peakHour] || 0;
+
+  const deliveredByCounts = completedOrders.reduce((acc, o) => {
+    const by = getDeliveredByLabel(o);
+    acc[by] = (acc[by] || 0) + 1;
+    return acc;
+  }, {});
+
+  const topDeliverers = Object.entries(deliveredByCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const recentCompleted = [...completedOrders]
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, 6);
 
   return (
     <div ref={containerRef} className="space-y-6 pb-20">
@@ -65,8 +91,8 @@ export default function ManagerDashboard() {
       {/* Top Stats - Compact 2-Column Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Active Route" value={activeOrders} suffix="Orders" icon={<Truck size={20} />} trend="live" />
-        <StatCard title="Target Revenue" value={`$${totalDues.toFixed(0)}`} icon={<TrendingUp size={20} />} />
-        <StatCard title="Total Stock" value={inventory.length} suffix="Items" icon={<Package size={20} />} />
+        <StatCard title="Completed Orders" value={completedCount} suffix="Delivered" icon={<CheckCircle size={20} />} />
+        <StatCard title="Peak Order Time" value={peakHourOrders > 0 ? formatHourRange(peakHour) : '--'} suffix={peakHourOrders > 0 ? `${peakHourOrders} Orders` : 'No Data'} icon={<TrendingUp size={20} />} />
         <StatCard title="Stock Warnings" value={lowStock} icon={<AlertTriangle size={20} />} alert={lowStock > 0} />
       </div>
 
@@ -145,6 +171,60 @@ export default function ManagerDashboard() {
           </div>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="dash-card glass-card !p-0 overflow-hidden flex flex-col min-h-[260px]">
+          <div className="p-6 border-b border-black/5 flex justify-between items-center">
+            <h3 className="text-xl font-black text-primary tracking-tight">Who Delivered</h3>
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary/50">Completed Orders</span>
+          </div>
+          <div className="p-4 space-y-3 flex-1">
+            {topDeliverers.length > 0 ? topDeliverers.map((d) => (
+              <div key={d.name} className="flex items-center justify-between p-4 bg-white/40 rounded-2xl border border-black/5">
+                <div>
+                  <p className="font-black text-primary tracking-tight">{d.name}</p>
+                  <p className="text-[10px] font-bold uppercase text-primary/50">Delivered by</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-black text-primary tracking-tighter">{d.count}</p>
+                  <p className="text-[10px] font-bold uppercase text-primary/50">Orders</p>
+                </div>
+              </div>
+            )) : (
+              <div className="h-full min-h-[180px] flex flex-col items-center justify-center opacity-60">
+                <Truck size={28} className="text-primary/40 mb-2" />
+                <p className="text-sm font-bold uppercase tracking-widest text-primary/70">No delivered orders yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="dash-card glass-card !p-0 overflow-hidden flex flex-col min-h-[260px]">
+          <div className="p-6 border-b border-black/5 flex justify-between items-center">
+            <h3 className="text-xl font-black text-primary tracking-tight">Recent Completed</h3>
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary/50">With Time</span>
+          </div>
+          <div className="p-4 space-y-3 flex-1">
+            {recentCompleted.length > 0 ? recentCompleted.map((o) => (
+              <div key={o._id} className="flex items-center justify-between p-4 bg-green-50/60 rounded-2xl border border-green-200/40">
+                <div>
+                  <p className="font-black text-primary tracking-tight text-sm sm:text-base">{o.customer?.name || 'Walk-in'}</p>
+                  <p className="text-[10px] font-bold uppercase text-primary/55">{getDeliveredByLabel(o)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] font-black uppercase text-green-700">{formatDateTime(o.updatedAt)}</p>
+                  <p className="text-[10px] font-bold text-primary/50">#{o._id.slice(-6).toUpperCase()}</p>
+                </div>
+              </div>
+            )) : (
+              <div className="h-full min-h-[180px] flex flex-col items-center justify-center opacity-60">
+                <CheckCircle size={28} className="text-primary/40 mb-2" />
+                <p className="text-sm font-bold uppercase tracking-widest text-primary/70">No completed timeline</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -194,4 +274,31 @@ function getStatusColor(status) {
     case 'issue': return 'bg-orange-100 text-orange-700';
     default: return 'bg-gray-100 text-gray-700';
   }
+}
+
+function formatHourRange(hour) {
+  const start = new Date();
+  start.setHours(hour, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(hour + 1);
+  const startLabel = start.toLocaleTimeString([], { hour: 'numeric', hour12: true });
+  const endLabel = end.toLocaleTimeString([], { hour: 'numeric', hour12: true });
+  return `${startLabel} - ${endLabel}`;
+}
+
+function formatDateTime(ts) {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '--';
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
+function getDeliveredByLabel(order) {
+  if (order?.assignedBySelf) return 'By Self';
+  if (order?.assignedWorker?.username) return order.assignedWorker.username;
+  return 'Not Assigned';
 }

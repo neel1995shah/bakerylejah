@@ -1,5 +1,6 @@
 import Product from '../models/Product.js';
 import Inventory from '../models/Inventory.js';
+import { io } from '../index.js';
 
 export const getProducts = async (req, res) => {
   try {
@@ -48,6 +49,16 @@ export const createProduct = async (req, res) => {
     });
     
     await inventory.save();
+
+    io.emit('inventoryItemCreated', {
+      inventoryId: inventory._id,
+      productId: createdProduct._id,
+      productName: createdProduct.name,
+      quantity: inventory.quantity,
+      unit: inventory.unit,
+      createdAt: new Date().toISOString()
+    });
+
     res.status(201).json(createdProduct);
   } catch (error) {
     res.status(400).json({ message: error.message });

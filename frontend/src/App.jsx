@@ -7,6 +7,9 @@ import WorkerDashboard from './pages/WorkerDashboard.jsx';
 import Orders from './pages/Orders.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Customers from './pages/Customers.jsx';
+import Notifications from './pages/Notifications.jsx';
+import StockRegistration from './pages/StockRegistration.jsx';
+import CustomerNeed from './pages/CustomerNeed.jsx';
 
 const adminRoles = ['owner', 'sub_manager', 'manager'];
 
@@ -53,6 +56,24 @@ export default function App() {
           <Route path="/customers" element={
             <ProtectedRoute allowedRole={adminRoles}>
               <Customers />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <Notifications />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/stock-registration" element={
+            <ProtectedRoute>
+              <StockRegistration />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/customer-need" element={
+            <ProtectedRoute>
+              <CustomerNeed />
             </ProtectedRoute>
           } />
 
