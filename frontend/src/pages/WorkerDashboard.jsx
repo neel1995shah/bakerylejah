@@ -21,8 +21,8 @@ export default function WorkerDashboard() {
     const fetchData = async () => {
       try {
         const [ordersRes, invRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/orders/my-deliveries'),
-          axios.get('http://localhost:5000/api/inventory')
+          axios.get('/api/orders/my-deliveries'),
+          axios.get('/api/inventory')
         ]);
         setDeliveries(ordersRes.data);
         setInventory(invRes.data);
@@ -38,7 +38,7 @@ export default function WorkerDashboard() {
     };
     fetchData();
 
-    const socket = io('http://localhost:5000');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
     socket.on('connect', () => {
       const username = localStorage.getItem('username');
       socket.emit('join_room', username);
@@ -53,7 +53,7 @@ export default function WorkerDashboard() {
 
   const updateStatus = async (orderId, status) => {
     try {
-      const res = await axios.patch(`http://localhost:5000/api/orders/${orderId}/status`, { status });
+      const res = await axios.patch(`/api/orders/${orderId}/status`, { status });
       setDeliveries(prev => prev.map(o => o._id === orderId ? res.data : o));
     } catch (err) {
       alert('Failed to update status');
@@ -63,7 +63,7 @@ export default function WorkerDashboard() {
   const handleReportMissing = async () => {
     if (!missingItemId) return;
     try {
-      await axios.put(`http://localhost:5000/api/inventory/${missingItemId}`, {
+      await axios.put(`/api/inventory/${missingItemId}`, {
         quantity: 0
       });
       setReportModalOpen(false);
