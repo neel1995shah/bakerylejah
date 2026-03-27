@@ -85,7 +85,7 @@ export default function Login() {
         return;
       }
 
-      const res = await axios.post('http://localhost:5000/api/auth/login', { username, pin: cleanPin });
+      const res = await axios.post('/api/auth/login', { username, pin: cleanPin });
       const { token, role, _id } = res.data;
       
       localStorage.setItem('token', token);

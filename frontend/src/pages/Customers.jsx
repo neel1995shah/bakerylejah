@@ -26,7 +26,7 @@ export default function Customers() {
   const getTokenHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
 
   const fetchEntity = async (entity, setState) => {
-    const res = await axios.get(`http://localhost:5000/api/${entity}`, {
+    const res = await axios.get(`/api/${entity}`, {
       headers: getTokenHeader()
     });
     setState(res.data);
@@ -99,7 +99,7 @@ export default function Customers() {
 
     try {
       await axios.post(
-        `http://localhost:5000/api/${activeTab}`,
+        `/api/${activeTab}`,
         {
           name: form.name.trim(),
           phone: form.phone.trim(),
@@ -126,7 +126,7 @@ export default function Customers() {
     setError('');
 
     try {
-      await axios.delete(`http://localhost:5000/api/${activeTab}/${id}`, {
+      await axios.delete(`/api/${activeTab}/${id}`, {
         headers: getTokenHeader()
       });
 
@@ -333,3 +333,4 @@ export default function Customers() {
     </div>
   );
 }
+

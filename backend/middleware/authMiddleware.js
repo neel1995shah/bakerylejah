@@ -44,3 +44,20 @@ export const workerOnly = (req, res, next) => {
     res.status(403).json({ message: 'Not authorized as worker' });
   }
 };
+
+export const managerOrWorker = (req, res, next) => {
+  if (req.user && (adminRoles.includes(normalizeRole(req.user.role)) || req.user.role === 'worker')) {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized' });
+  }
+};
+
+export const ownerOrManager = (req, res, next) => {
+  const normalizedRole = normalizeRole(req.user?.role);
+  if (req.user && (normalizedRole === 'owner' || normalizedRole === 'manager' || normalizedRole === 'sub_manager')) {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized. Only owners and managers can perform this action.' });
+  }
+};

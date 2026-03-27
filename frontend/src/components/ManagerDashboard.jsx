@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
+import { SOCKET_ORIGIN } from '../config/runtime.js';
 
 export default function ManagerDashboard() {
   const [orders, setOrders] = useState([]);
@@ -10,14 +11,14 @@ export default function ManagerDashboard() {
       const token = localStorage.getItem('token');
       // In a real app we would combine these to a single API or use Promise.all
       // Fetching Orders
-      const orderRes = await fetch('http://localhost:5000/api/orders', {
+      const orderRes = await fetch('/api/orders', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const ordersData = await orderRes.json();
       setOrders(ordersData);
 
       // Fetching Inventory
-      const invRes = await fetch('http://localhost:5000/api/inventory', {
+      const invRes = await fetch('/api/inventory', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const invData = await invRes.json();
@@ -27,7 +28,7 @@ export default function ManagerDashboard() {
     fetchDashboardData();
 
     // Socket Initialization
-    const socket = io('http://localhost:5000');
+    const socket = io(SOCKET_ORIGIN);
     
     socket.on('connect', () => {
       socket.emit('join_room', 'manager');

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import { SOCKET_ORIGIN } from '../config/runtime.js';
 import { Search, Plus, Eye, Heart, IndianRupee, Package } from 'lucide-react';
 import Modal from '../components/ui/Modal.jsx';
 import gsap from 'gsap';
@@ -29,7 +30,7 @@ export default function Inventory() {
     axios.defaults.headers.common.Authorization = `Bearer ${token}`;
 
     try {
-      const res = await axios.get('http://localhost:5000/api/inventory');
+      const res = await axios.get('/api/inventory');
       setInventory(res.data || []);
 
       gsap.fromTo(
@@ -45,7 +46,7 @@ export default function Inventory() {
   useEffect(() => {
     fetchInventory();
 
-    const socket = io('http://localhost:5000');
+    const socket = io(SOCKET_ORIGIN);
     socket.on('stockUpdated', (inv) => {
       setInventory((prev) => prev.map((i) => (i._id === inv._id ? inv : i)));
     });
@@ -76,9 +77,9 @@ export default function Inventory() {
       const formData = new FormData();
       formData.append('image', newProduct.imageFile);
 
-      const uploadRes = await axios.post('http://localhost:5000/api/uploads/image', formData);
+      const uploadRes = await axios.post('/api/uploads/image', formData);
 
-      await axios.post('http://localhost:5000/api/products', {
+      await axios.post('/api/products', {
         name: newProduct.name.trim(),
         quantitySize: newProduct.quantitySize.trim(),
         price: Number(newProduct.price),
@@ -263,3 +264,4 @@ export default function Inventory() {
     </div>
   );
 }
+
