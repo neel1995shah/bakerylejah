@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { Store, LayoutDashboard, ShoppingCart, Package, Users, LogOut, Truck, ChevronRight, Bell, ClipboardList, NotebookPen } from 'lucide-react';
@@ -8,7 +8,11 @@ export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const notificationRef = useRef(null);
+  const profileRef = useRef(null);
+  
   const [notifications, setNotifications] = useState(() => {
     try {
       const stored = localStorage.getItem('notifications');
@@ -26,6 +30,14 @@ export default function Layout() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const pushNotification = (next) => {
+    // Play notification sound
+    try {
+      const audio = new Audio('/notification.mp3');
+      audio.play().catch(e => console.log('Audio autoplay prevented:', e));
+    } catch (e) {
+      console.log('Audio creation failed:', e);
+    }
+
     setNotifications((prev) => [{
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       read: false,
@@ -55,19 +67,46 @@ export default function Layout() {
          { path: '/stock-registration', label: 'Stock Registration', icon: <ClipboardList size={24} /> },
          { path: '/customer-need', label: 'Customer Need', icon: <NotebookPen size={24} /> },
          { path: '/customers', label: 'Customers', icon: <Users size={24} /> },
-         { path: '/notifications', label: 'Notifications', icon: <Bell size={24} /> },
        ]
      : [
          { path: '/worker', label: 'Deliveries', icon: <Truck size={24} /> },
          { path: '/stock-registration', label: 'Stock Registration', icon: <ClipboardList size={24} /> },
          { path: '/customer-need', label: 'Customer Need', icon: <NotebookPen size={24} /> },
-         { path: '/notifications', label: 'Notifications', icon: <Bell size={24} /> },
        ];
 
   // Close mobile sidebar on navigation
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [location.pathname]);
+
+  // Click outside and Esc handlers for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isNotificationOpen && notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setIsNotificationOpen(false);
+      }
+      if (isProfileOpen && profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    const handleEscAction = (event) => {
+      if (event.key === 'Escape') {
+        setIsNotificationOpen(false);
+        setIsProfileOpen(false);
+      }
+    };
+
+    if (isNotificationOpen || isProfileOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscAction);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscAction);
+    };
+  }, [isNotificationOpen, isProfileOpen]);
 
   useEffect(() => {
     localStorage.setItem('notifications', JSON.stringify(notifications));
@@ -221,32 +260,103 @@ export default function Layout() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 h-full relative">
         {/* Universal Header */}
-        <header className="h-20 bg-white/40 backdrop-blur-md border-b border-black/5 flex items-center justify-between px-6 lg:px-10 z-30">
-          <div className="flex items-center gap-6">
-            <img src={brandLogo} alt="Lejaah logo" className="h-10 w-10 rounded-full object-cover shadow-sm ring-2 ring-black/5" />
-            <h2 className="text-2xl font-bold text-primary tracking-tight capitalize">
-              {location.pathname.replace('/', '') || 'Overview'}
+        <header className="h-20 bg-white/40 backdrop-blur-md border-b border-black/5 flex items-center justify-between px-4 lg:px-10 z-30">
+          <div className="flex items-center gap-3 lg:gap-6 min-w-0 mr-4">
+            <img src={brandLogo} alt="Lejaah logo" className="h-10 w-10 flex-shrink-0 rounded-full object-cover shadow-sm ring-2 ring-black/5" />
+            <h2 className="text-xl lg:text-2xl font-bold text-primary tracking-tight capitalize truncate">
+              {location.pathname.replace('/', '').replace(/-/g, ' ') || 'Overview'}
             </h2>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 lg:gap-4 flex-shrink-0">
             <div className="flex flex-col items-end hidden md:flex">
               <span className="text-sm font-bold text-primary">{username}</span>
               <span className="text-[10px] uppercase tracking-tighter text-primary/40 leading-none">{role} account</span>
             </div>
             
+            {/* Notification Dropdown */}
+            <div className="relative" ref={notificationRef}>
+              <button 
+                onClick={() => {
+                  if (location.pathname !== '/notifications') {
+                    setIsNotificationOpen(!isNotificationOpen);
+                  } else {
+                    navigate('/notifications');
+                  }
+                }}
+                className={`relative w-12 h-12 rounded-2xl bg-white/50 flex flex-shrink-0 items-center justify-center text-primary shadow-sm border border-black/5 hover:bg-white/80 transition-colors active:scale-95 group focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 ${(isNotificationOpen || location.pathname === '/notifications') ? 'bg-white/80 ring-2 ring-primary/20' : ''}`}
+                aria-label="Notifications"
+                aria-expanded={isNotificationOpen}
+                aria-haspopup="true"
+              >
+                <Bell size={24} className="group-hover:scale-110 transition-transform duration-300" aria-hidden="true" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-white/80 shadow-sm shadow-red-500/20">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationOpen && location.pathname !== '/notifications' && (
+                <>
+                  <div className="fixed sm:absolute top-20 sm:top-14 left-4 right-4 sm:left-auto sm:right-0 w-auto sm:w-96 bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-antigravity border border-black/5 overflow-hidden z-50 flex flex-col max-h-[calc(100vh-100px)] sm:max-h-[400px]">
+                    <div className="p-4 border-b border-black/5 flex justify-between items-center bg-white/50">
+                      <h3 className="font-bold text-primary">Recent Notifications</h3>
+                      {unreadCount > 0 && (
+                        <span className="bg-primary text-secondary text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                         {unreadCount} New
+                        </span>
+                      )}
+                    </div>
+                    <div className="overflow-y-auto flex-1 p-2 space-y-2">
+                       {notifications.length === 0 ? (
+                          <div className="p-6 text-center text-primary/40 font-medium text-sm">You're all caught up!</div>
+                       ) : (
+                          notifications.slice(0, 5).map(n => (
+                            <Link 
+                              key={n.id} 
+                              to="/notifications" 
+                              onClick={() => setIsNotificationOpen(false)}
+                              className={`block p-3 rounded-2xl transition-all duration-300 hover:scale-[1.02] ${!n.read ? 'bg-white hover:bg-white shadow-sm ring-1 ring-black/5' : 'bg-transparent hover:bg-black/5'}`}
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                {!n.read && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
+                                <div className="text-sm font-bold text-primary truncate">{n.title}</div>
+                              </div>
+                              <div className="text-xs text-primary/60 line-clamp-2">{n.message}</div>
+                              <div className="text-[10px] text-primary/40 mt-2 font-medium">{new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                            </Link>
+                          ))
+                       )}
+                    </div>
+                    <div className="p-3 border-t border-black/5 bg-black/5">
+                      <Link 
+                        to="/notifications" 
+                        onClick={() => setIsNotificationOpen(false)}
+                        className="block w-full text-center py-3 bg-white text-primary rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary hover:text-secondary transition-colors shadow-sm"
+                      >
+                        View All Notifications
+                      </Link>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Profile Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={profileRef}>
               <button 
                 onClick={() => setIsProfileOpen(!isProfileOpen)} 
-                className="w-12 h-12 rounded-2xl bg-primary flex flex-shrink-0 items-center justify-center text-secondary font-black shadow-lg shadow-primary/20 border-2 border-white/50 hover:opacity-90 transition-opacity active:scale-95"
+                className="w-12 h-12 rounded-2xl bg-primary flex flex-shrink-0 items-center justify-center text-secondary font-black shadow-lg shadow-primary/20 border-2 border-white/50 hover:opacity-90 transition-opacity active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
+                aria-label="User profile menu"
+                aria-expanded={isProfileOpen}
+                aria-haspopup="true"
               >
                 {username.charAt(0).toUpperCase()}
               </button>
               
               {isProfileOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)} />
                   <div className="absolute top-14 right-0 w-48 bg-white/90 backdrop-blur-lg rounded-2xl shadow-antigravity border border-black/5 p-2 z-50">
                     <button 
                       onClick={() => {

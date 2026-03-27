@@ -144,7 +144,7 @@ export default function Customers() {
   const singularLabel = activeTab === 'customers' ? 'Customer' : 'Supplier';
 
   return (
-    <div className="space-y-3 bg-white pb-28 text-slate-900 md:space-y-4 md:pb-10">
+    <div className="space-y-3 pb-28 text-slate-900 md:space-y-4 md:pb-10">
       <header className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <div>

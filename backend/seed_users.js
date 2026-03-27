@@ -7,7 +7,7 @@ dotenv.config();
 const seedUsers = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/grocery');
-    
+
     // Clear existing users
     await User.deleteMany({});
     console.log('Cleared existing users.');
