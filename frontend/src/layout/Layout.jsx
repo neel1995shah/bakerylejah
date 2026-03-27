@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Store, LayoutDashboard, ShoppingCart, Package, Users, LogOut, Truck, ChevronRight } from 'lucide-react';
+import brandLogo from '../assets/logo.svg';
 
 export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -11,6 +12,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const role = localStorage.getItem('role') || 'worker';
+  const isAdmin = ['owner', 'sub_manager', 'manager'].includes(role);
   const username = localStorage.getItem('username') || 'User';
 
   const handleLogout = () => {
@@ -18,7 +20,7 @@ export default function Layout() {
     navigate('/');
   };
 
-  const navItems = role === 'manager' 
+  const navItems = isAdmin 
      ? [
          { path: '/manager', label: 'Dashboard', icon: <LayoutDashboard size={24} /> },
          { path: '/orders', label: 'Orders', icon: <ShoppingCart size={24} /> },
@@ -44,8 +46,8 @@ export default function Layout() {
       `}>
         {/* Logo Area */}
         <div className="p-8 flex items-center gap-4 border-b border-white/5 relative">
-          <div className="bg-secondary/10 p-2.5 rounded-2xl backdrop-blur-md flex-shrink-0">
-            <Store className="text-secondary" size={28} />
+          <div className="rounded-full p-0.5 shadow-lg flex-shrink-0 overflow-hidden ring-2 ring-white/30">
+            <img src={brandLogo} alt="Lejaah logo" className="h-10 w-10 rounded-full object-cover" />
           </div>
           {!isCollapsed && (
             <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic whitespace-nowrap">
@@ -105,6 +107,7 @@ export default function Layout() {
         {/* Universal Header */}
         <header className="h-20 bg-white/40 backdrop-blur-md border-b border-black/5 flex items-center justify-between px-6 lg:px-10 z-30">
           <div className="flex items-center gap-6">
+            <img src={brandLogo} alt="Lejaah logo" className="h-10 w-10 rounded-full object-cover shadow-sm ring-2 ring-black/5" />
             <h2 className="text-2xl font-bold text-primary tracking-tight capitalize">
               {location.pathname.replace('/', '') || 'Overview'}
             </h2>
@@ -203,4 +206,4 @@ export default function Layout() {
       )}
     </div>
   );
-}
+}

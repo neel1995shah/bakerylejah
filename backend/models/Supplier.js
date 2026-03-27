@@ -1,14 +1,14 @@
 import mongoose from 'mongoose';
 
-const customerSchema = new mongoose.Schema({
-  name: { 
-    type: String, 
+const supplierSchema = new mongoose.Schema({
+  name: {
+    type: String,
     required: true,
     trim: true
   },
-  phone: { 
-    type: String, 
-    required: true, 
+  phone: {
+    type: String,
+    required: true,
     unique: true,
     index: true,
     trim: true
@@ -18,11 +18,11 @@ const customerSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  dues: { 
-    type: Number, 
+  dues: {
+    type: Number,
     default: 0,
-    min: 0 
+    min: 0
   }
 }, { timestamps: true });
 
-export default mongoose.model('Customer', customerSchema);
+export default mongoose.model('Supplier', supplierSchema);

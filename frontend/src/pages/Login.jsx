@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Store, User, Lock, Loader2 } from 'lucide-react';
 import gsap from 'gsap';
+import brandLogo from '../assets/logo.svg';
+
+const adminRoles = ['owner', 'sub_manager', 'manager'];
 
 export default function Login() {
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -75,7 +78,14 @@ export default function Login() {
     setError('');
     
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', { username, password });
+      const cleanPin = String(pin || '').replace(/\D/g, '');
+      if (cleanPin.length !== 4) {
+        setError('PIN must be exactly 4 digits.');
+        setLoading(false);
+        return;
+      }
+
+      const res = await axios.post('http://localhost:5000/api/auth/login', { username, pin: cleanPin });
       const { token, role, _id } = res.data;
       
       localStorage.setItem('token', token);
@@ -88,7 +98,7 @@ export default function Login() {
         opacity: 0,
         duration: 0.5,
         ease: 'power2.in',
-        onComplete: () => navigate(role === 'manager' ? '/manager' : '/worker')
+        onComplete: () => navigate(adminRoles.includes(role) ? '/manager' : '/worker')
       });
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please check credentials.');
@@ -119,8 +129,8 @@ export default function Login() {
         style={{ transformStyle: 'preserve-3d' }}
       >
         <div className="p-10 text-center">
-          <div ref={logoRef} className="inline-flex p-5 bg-[#143129] rounded-3xl mb-6 shadow-2xl transform-gpu" style={{ transform: 'translateZ(30px)' }}>
-            <Store size={48} className="text-[#F9F6F0]" />
+          <div ref={logoRef} className="inline-flex p-1 rounded-full mb-6 shadow-2xl transform-gpu ring-2 ring-[#143129]/10" style={{ transform: 'translateZ(30px)' }}>
+            <img src={brandLogo} alt="Lejaah logo" className="h-20 w-20 rounded-full object-cover" />
           </div>
           <h2 className="text-4xl font-extrabold text-[#143129] tracking-tight mb-2 transform-gpu" style={{ transform: 'translateZ(20px)' }}>
             Lejaah
@@ -159,15 +169,17 @@ export default function Login() {
             <div className="space-y-3">
               <label className="flex items-center gap-2 text-sm font-semibold text-[#143129] ml-1">
                 <Lock size={16} />
-                Password
+                4-Digit PIN
               </label>
               <div className="relative group">
                 <input 
-                  type="password" 
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
                   className="w-full px-6 py-4 rounded-2xl bg-white/50 border border-[#143129]/10 focus:border-[#143129]/30 focus:bg-white/80 focus:ring-4 focus:ring-[#143129]/5 transition-all duration-300 outline-none placeholder:text-[#143129]/20"
-                  placeholder="••••••••" 
-                  value={password} 
-                  onChange={e=>setPassword(e.target.value)} 
+                  placeholder="0000"
+                  value={pin}
+                  onChange={e=>setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   required 
                 />
               </div>

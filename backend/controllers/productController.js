@@ -11,14 +11,32 @@ export const getProducts = async (req, res) => {
 };
 
 export const createProduct = async (req, res) => {
-  const { name, description, basePrice, category, quantity, unit, reorderLevel } = req.body;
+  const {
+    name,
+    description,
+    basePrice,
+    price,
+    category,
+    quantity,
+    unit,
+    reorderLevel,
+    quantitySize,
+    image,
+    imageUrl
+  } = req.body;
+
   try {
+    const normalizedPrice = Number(price ?? basePrice ?? 0);
+
     const product = new Product({ 
       name, 
       description, 
-      basePrice, 
-      category 
+      basePrice: normalizedPrice,
+      category,
+      quantitySize: quantitySize || '',
+      imageUrl: imageUrl || image || ''
     });
+
     const createdProduct = await product.save();
     
     // Create corresponding inventory record
@@ -45,8 +63,10 @@ export const updateProduct = async (req, res) => {
       
     product.name = req.body.name || product.name;
     product.description = req.body.description || product.description;
-    product.basePrice = req.body.basePrice || product.basePrice;
+    product.basePrice = req.body.price ?? req.body.basePrice ?? product.basePrice;
     product.category = req.body.category || product.category;
+    product.quantitySize = req.body.quantitySize ?? product.quantitySize;
+    product.imageUrl = req.body.imageUrl ?? req.body.image ?? product.imageUrl;
 
     const updatedProduct = await product.save();
     res.json(updatedProduct);

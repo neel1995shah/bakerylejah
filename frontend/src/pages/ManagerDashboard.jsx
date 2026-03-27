@@ -21,12 +21,6 @@ export default function ManagerDashboard() {
         ]);
         setOrders(ordersRes.data);
         setInventory(invRes.data);
-
-        // Staggered entrance animation
-        gsap.fromTo(".dash-card",
-          { y: 30, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: "power2.out" }
-        );
       } catch (err) {
         console.error('Failed to fetch dashboard data', err);
       }
@@ -43,6 +37,16 @@ export default function ManagerDashboard() {
 
     return () => socket.disconnect();
   }, []);
+
+  useEffect(() => {
+    const cards = containerRef.current?.querySelectorAll('.dash-card');
+    if (!cards || cards.length === 0) return;
+
+    gsap.fromTo(cards,
+      { y: 30, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.6, stagger: 0.08, ease: 'power2.out', overwrite: 'auto' }
+    );
+  }, [orders.length, inventory.length]);
 
   const totalDues = orders.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
   const activeOrders = orders.filter(o => o.deliveryStatus !== 'delivered').length;
@@ -177,5 +181,17 @@ function getStatusPulse(status) {
     case 'in-transit': return 'bg-yellow-400';
     case 'delivered': return 'bg-green-400';
     default: return 'bg-gray-200';
+  }
+}
+
+function getStatusColor(status) {
+  switch (status) {
+    case 'pending': return 'bg-gray-100 text-gray-700';
+    case 'assigned': return 'bg-blue-100 text-blue-700';
+    case 'in-transit': return 'bg-yellow-100 text-yellow-700';
+    case 'delivered': return 'bg-green-100 text-green-700';
+    case 'cancelled': return 'bg-red-100 text-red-700';
+    case 'issue': return 'bg-orange-100 text-orange-700';
+    default: return 'bg-gray-100 text-gray-700';
   }
 }

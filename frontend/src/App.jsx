@@ -8,13 +8,18 @@ import Orders from './pages/Orders.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Customers from './pages/Customers.jsx';
 
+const adminRoles = ['owner', 'sub_manager', 'manager'];
+
 function ProtectedRoute({ children, allowedRole }) {
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('role');
 
   if (!token) return <Navigate to="/" replace />;
-  if (allowedRole && role !== allowedRole) {
-    return <Navigate to={role === 'manager' ? '/manager' : '/worker'} replace />;
+  if (allowedRole) {
+    const allowed = Array.isArray(allowedRole) ? allowedRole : [allowedRole];
+    if (!allowed.includes(role)) {
+      return <Navigate to={adminRoles.includes(role) ? '/manager' : '/worker'} replace />;
+    }
   }
 
   return children;
@@ -28,25 +33,25 @@ export default function App() {
         
         <Route element={<Layout />}>
           <Route path="/manager" element={
-            <ProtectedRoute allowedRole="manager">
+            <ProtectedRoute allowedRole={adminRoles}>
               <ManagerDashboard />
             </ProtectedRoute>
           } />
           
           <Route path="/orders" element={
-            <ProtectedRoute allowedRole="manager">
+            <ProtectedRoute allowedRole={adminRoles}>
               <Orders />
             </ProtectedRoute>
           } />
           
           <Route path="/inventory" element={
-            <ProtectedRoute allowedRole="manager">
+            <ProtectedRoute allowedRole={adminRoles}>
               <Inventory />
             </ProtectedRoute>
           } />
 
           <Route path="/customers" element={
-            <ProtectedRoute allowedRole="manager">
+            <ProtectedRoute allowedRole={adminRoles}>
               <Customers />
             </ProtectedRoute>
           } />

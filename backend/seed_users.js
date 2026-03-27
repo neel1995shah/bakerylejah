@@ -13,14 +13,19 @@ const seedUsers = async () => {
     console.log('Cleared existing users.');
 
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash('password123', salt);
+    const hashedPin = await bcrypt.hash('1234', salt);
 
     await User.create([
-      { name: 'Admin User', username: 'admin', password: hashedPassword, role: 'manager' },
-      { name: 'Worker One', username: 'worker1', password: hashedPassword, role: 'worker' }
+      { name: 'Owner One', username: 'owner1', pin: hashedPin, role: 'owner', failedPinAttempts: 0, lockUntil: null },
+      { name: 'Owner Two', username: 'owner2', pin: hashedPin, role: 'owner', failedPinAttempts: 0, lockUntil: null },
+      { name: 'Owner Three', username: 'owner3', pin: hashedPin, role: 'owner', failedPinAttempts: 0, lockUntil: null },
+      { name: 'Sub Manager One', username: 'submanager1', pin: hashedPin, role: 'sub_manager', failedPinAttempts: 0, lockUntil: null },
+      { name: 'Worker One', username: 'worker1', pin: hashedPin, role: 'worker', failedPinAttempts: 0, lockUntil: null },
+      { name: 'Worker Two', username: 'worker2', pin: hashedPin, role: 'worker', failedPinAttempts: 0, lockUntil: null },
+      { name: 'Worker Three', username: 'worker3', pin: hashedPin, role: 'worker', failedPinAttempts: 0, lockUntil: null }
     ]);
 
-    console.log('Seeded Users: manager (admin/password123), worker (worker1/password123)');
+    console.log('Seeded 7 users: 3 owners, 1 sub-manager, 3 workers (all use PIN 1234)');
     process.exit(0);
   } catch (err) {
     console.error(err.message);

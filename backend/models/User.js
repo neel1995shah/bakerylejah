@@ -14,13 +14,21 @@ const userSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   },
-  password: { 
-    type: String, 
-    required: true 
+  pin: {
+    type: String,
+    required: true
+  },
+  failedPinAttempts: {
+    type: Number,
+    default: 0
+  },
+  lockUntil: {
+    type: Date,
+    default: null
   },
   role: { 
     type: String, 
-    enum: ['manager', 'worker'], 
+    enum: ['owner', 'sub_manager', 'manager', 'worker'], 
     default: 'worker',
     index: true
   },

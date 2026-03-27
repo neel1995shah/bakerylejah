@@ -12,6 +12,8 @@ import orderRoutes from './routes/orderRoutes.js';
 // But we will add inventoryRoutes instead for real-time stock
 import inventoryRoutes from './routes/inventoryRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
+import supplierRoutes from './routes/supplierRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
 
 import { initSockets } from './sockets/index.js';
 
@@ -46,6 +48,8 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server started on port ${PORT}`));

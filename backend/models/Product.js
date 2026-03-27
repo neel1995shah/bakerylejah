@@ -7,6 +7,11 @@ const productSchema = new mongoose.Schema({
     index: true,
     trim: true
   },
+  quantitySize: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   description: { 
     type: String,
     trim: true 
@@ -27,6 +32,11 @@ const productSchema = new mongoose.Schema({
     type: Number, 
     required: true,
     min: 0
+  },
+  imageUrl: {
+    type: String,
+    trim: true,
+    default: ''
   },
   isActive: {
     type: Boolean,
