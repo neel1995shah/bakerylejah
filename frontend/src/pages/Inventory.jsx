@@ -29,7 +29,7 @@ export default function Inventory() {
     axios.defaults.headers.common.Authorization = `Bearer ${token}`;
 
     try {
-      const res = await axios.get('http://localhost:5000/api/inventory');
+      const res = await axios.get('/api/inventory');
       setInventory(res.data || []);
 
       gsap.fromTo(
@@ -45,7 +45,7 @@ export default function Inventory() {
   useEffect(() => {
     fetchInventory();
 
-    const socket = io('http://localhost:5000');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
     socket.on('stockUpdated', (inv) => {
       setInventory((prev) => prev.map((i) => (i._id === inv._id ? inv : i)));
     });
@@ -76,9 +76,9 @@ export default function Inventory() {
       const formData = new FormData();
       formData.append('image', newProduct.imageFile);
 
-      const uploadRes = await axios.post('http://localhost:5000/api/uploads/image', formData);
+      const uploadRes = await axios.post('/api/uploads/image', formData);
 
-      await axios.post('http://localhost:5000/api/products', {
+      await axios.post('/api/products', {
         name: newProduct.name.trim(),
         quantitySize: newProduct.quantitySize.trim(),
         price: Number(newProduct.price),
@@ -263,3 +263,4 @@ export default function Inventory() {
     </div>
   );
 }
+

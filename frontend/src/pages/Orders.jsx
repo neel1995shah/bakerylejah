@@ -58,9 +58,9 @@ export default function Orders() {
     const fetchData = async () => {
       try {
         const [ordersRes, workersRes, invRes] = await Promise.allSettled([
-          axios.get('http://localhost:5000/api/orders'),
-          isAdminRole ? axios.get('http://localhost:5000/api/auth/users?role=worker') : Promise.resolve({ data: [] }),
-          axios.get('http://localhost:5000/api/inventory')
+          axios.get('/api/orders'),
+          isAdminRole ? axios.get('/api/auth/users?role=worker') : Promise.resolve({ data: [] }),
+          axios.get('/api/inventory')
         ]);
 
         if (ordersRes.status === 'fulfilled') {
@@ -89,7 +89,7 @@ export default function Orders() {
     };
     fetchData();
 
-    const socket = io('http://localhost:5000');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
     socket.on('connect', () => {
       if (role) socket.emit('join_room', role);
       socket.emit('join_room', 'manager');
@@ -133,7 +133,7 @@ export default function Orders() {
         ? { deliveryOption: 'by_self' }
         : { deliveryOption: 'worker', workerId: selection };
 
-      const res = await axios.put(`http://localhost:5000/api/orders/${orderId}/confirm`, payload);
+      const res = await axios.put(`/api/orders/${orderId}/confirm`, payload);
       setOrders(prev => prev.map(old => old._id === orderId ? res.data : old));
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to confirm order');
@@ -145,7 +145,7 @@ export default function Orders() {
     if (!accepted) return;
 
     try {
-      const res = await axios.put(`http://localhost:5000/api/orders/${orderId}/cancel`);
+      const res = await axios.put(`/api/orders/${orderId}/cancel`);
       setOrders(prev => prev.map(old => old._id === orderId ? res.data : old));
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to cancel order');
@@ -157,7 +157,7 @@ export default function Orders() {
     if (note === null) return;
 
     try {
-      const res = await axios.put(`http://localhost:5000/api/orders/${orderId}/issue`, { note });
+      const res = await axios.put(`/api/orders/${orderId}/issue`, { note });
       setOrders(prev => prev.map(old => old._id === orderId ? res.data : old));
       alert('Issue sent to owners and sub-managers.');
     } catch (err) {
@@ -167,7 +167,7 @@ export default function Orders() {
 
   const handleMarkDelivered = async (orderId) => {
     try {
-      const res = await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, { status: 'delivered' });
+      const res = await axios.put(`/api/orders/${orderId}/status`, { status: 'delivered' });
       setOrders(prev => prev.map(old => old._id === orderId ? res.data : old));
       addToast('success', `Order #${orderId.slice(-6).toUpperCase()} marked as delivered`, 'Order Completed');
     } catch (err) {
@@ -293,7 +293,7 @@ export default function Orders() {
     }
 
     try {
-      const orderRes = await axios.post('http://localhost:5000/api/orders', {
+      const orderRes = await axios.post('/api/orders', {
         customerData: { name, phone, address },
         totalAmount: cartTotal,
         items: cart.map(c => ({
@@ -310,7 +310,7 @@ export default function Orders() {
         const payload = createDeliverySelection === 'by_self'
           ? { deliveryOption: 'by_self' }
           : { deliveryOption: 'worker', workerId: createDeliverySelection };
-        await axios.put(`http://localhost:5000/api/orders/${orderRes.data._id}/confirm`, payload);
+        await axios.put(`/api/orders/${orderRes.data._id}/confirm`, payload);
       }
 
       setPOSModalOpen(false);
@@ -680,3 +680,4 @@ function getDeliveryColor(status) {
     default: return 'bg-gray-100 text-gray-800';
   }
 }
+

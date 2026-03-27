@@ -20,7 +20,7 @@ export default function CustomerNeed() {
 
     const fetchNeeds = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/customer-needs');
+        const res = await axios.get('/api/customer-needs');
         setNeeds(res.data || []);
       } catch (err) {
         console.error('Failed to load customer needs', err);
@@ -52,14 +52,14 @@ export default function CustomerNeed() {
       if (images.length > 0) {
         const data = new FormData();
         images.forEach((file) => data.append('images', file));
-        const uploadRes = await axios.post('http://localhost:5000/api/uploads/images', data, {
+        const uploadRes = await axios.post('/api/uploads/images', data, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
         imageUrls = (uploadRes.data?.images || []).map((img) => img.url).filter(Boolean);
         imagePublicIds = (uploadRes.data?.images || []).map((img) => img.publicId).filter(Boolean);
       }
 
-      const res = await axios.post('http://localhost:5000/api/customer-needs', {
+      const res = await axios.post('/api/customer-needs', {
         ...payload,
         imageUrls,
         imagePublicIds
@@ -76,7 +76,7 @@ export default function CustomerNeed() {
 
   const handleDone = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/customer-needs/${id}/done`);
+      await axios.put(`/api/customer-needs/${id}/done`);
       setNeeds((prev) => prev.filter((n) => n._id !== id));
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to mark as done');
@@ -200,3 +200,4 @@ export default function CustomerNeed() {
     </div>
   );
 }
+

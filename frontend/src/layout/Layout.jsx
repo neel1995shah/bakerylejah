@@ -74,7 +74,7 @@ export default function Layout() {
   }, [notifications]);
 
   useEffect(() => {
-    const socket = io('http://localhost:5000');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
 
     socket.on('connect', () => {
       if (role) socket.emit('join_room', role);
@@ -328,3 +328,4 @@ export default function Layout() {
     </div>
   );
 }
+

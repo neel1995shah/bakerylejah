@@ -16,8 +16,8 @@ export default function ManagerDashboard() {
     const fetchData = async () => {
       try {
         const [ordersRes, invRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/orders'),
-          axios.get('http://localhost:5000/api/inventory')
+          axios.get('/api/orders'),
+          axios.get('/api/inventory')
         ]);
         setOrders(ordersRes.data);
         setInventory(invRes.data);
@@ -27,7 +27,7 @@ export default function ManagerDashboard() {
     };
     fetchData();
 
-    const socket = io('http://localhost:5000');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
     socket.on('connect', () => socket.emit('join_room', 'manager'));
     socket.on('orderCreated', o => setOrders(prev => [...prev, o]));
     socket.on('workerAssigned', o => setOrders(prev => prev.map(old => old._id === o._id ? o : old)));

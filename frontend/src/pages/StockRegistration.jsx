@@ -18,7 +18,7 @@ export default function StockRegistration() {
 
     const fetchAlerts = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/stock-alerts');
+        const res = await axios.get('/api/stock-alerts');
         setAlerts(res.data || []);
       } catch (err) {
         console.error('Failed to load stock alerts', err);
@@ -46,7 +46,7 @@ export default function StockRegistration() {
       if (imageFile) {
         const form = new FormData();
         form.append('image', imageFile);
-        const uploadRes = await axios.post('http://localhost:5000/api/uploads/image', form, {
+        const uploadRes = await axios.post('/api/uploads/image', form, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
 
@@ -54,7 +54,7 @@ export default function StockRegistration() {
         imagePublicId = uploadRes.data?.publicId || '';
       }
 
-      const res = await axios.post('http://localhost:5000/api/stock-alerts', {
+      const res = await axios.post('/api/stock-alerts', {
         itemName: trimmed,
         note: note.trim(),
         priority,
@@ -76,7 +76,7 @@ export default function StockRegistration() {
 
   const handleComplete = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/stock-alerts/${id}/complete`);
+      await axios.put(`/api/stock-alerts/${id}/complete`);
       setAlerts((prev) => prev.filter((a) => a._id !== id));
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to complete stock alert');
@@ -215,3 +215,4 @@ function priorityBadge(priority) {
   if (priority === 'low') return 'bg-blue-100 text-blue-700';
   return 'bg-yellow-100 text-yellow-700';
 }
+

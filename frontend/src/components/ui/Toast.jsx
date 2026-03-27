@@ -52,3 +52,4 @@ export default function Toast({ id, type = 'success', message, title, onClose, d
     </div>
   );
 }
+

@@ -10,7 +10,7 @@ export default function WorkerDashboard() {
     const fetchOrders = async () => {
       // For simplicity, fetching all orders locally and filtering to test.
       // Optimally, backend would return just this worker's orders and pending ones.
-      const res = await fetch('http://localhost:5000/api/orders', {
+      const res = await fetch('/api/orders', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -20,7 +20,7 @@ export default function WorkerDashboard() {
 
     fetchOrders();
 
-    const socket = io('http://localhost:5000');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin));
     
     socket.on('connect', () => {
       socket.emit('join_room', 'worker');
@@ -57,7 +57,7 @@ export default function WorkerDashboard() {
   }, [token, userId]);
 
   const takeOrder = async (orderId) => {
-    await fetch(`http://localhost:5000/api/orders/${orderId}/assign`, {
+    await fetch(`/api/orders/${orderId}/assign`, {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
@@ -68,7 +68,7 @@ export default function WorkerDashboard() {
   };
 
   const updateDeliveryStatus = async (orderId, status) => {
-    await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+    await fetch(`/api/orders/${orderId}/status`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

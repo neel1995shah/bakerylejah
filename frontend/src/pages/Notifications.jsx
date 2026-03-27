@@ -116,3 +116,4 @@ function formatTime(ts) {
   if (Number.isNaN(d.getTime())) return 'just now';
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
