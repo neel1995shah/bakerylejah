@@ -6,7 +6,10 @@ dotenv.config();
 
 const seedUsers = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://everywheremail60_db_user:LRIGyUZRUpiFqXe6@rmanage.jlxcjls.mongodb.net/?appName=Rmanage');
+    if (!process.env.MONGO_URI) {
+      throw new Error('MONGO_URI environment variable is required');
+    }
+    await mongoose.connect(process.env.MONGO_URI);
 
     // Clear existing users
     await User.deleteMany({});
