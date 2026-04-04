@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Users, Search, Plus, Trash2, FileText, ArrowUpDown } from 'lucide-react';
 import gsap from 'gsap';
 
 export default function Customers() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('customers');
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -11,13 +13,16 @@ export default function Customers() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [form, setForm] = useState({
     name: '',
     phone: '',
     address: ''
   });
 
-  const isAdmin = ['owner', 'sub_manager', 'manager'].includes(localStorage.getItem('role'));
+  const role = (localStorage.getItem('role') || '').toLowerCase();
+  const isAdmin = ['owner', 'sub_manager', 'manager'].includes(role);
+  const isOwner = ['owner', 'sub_manager', 'manager', 'admin', 'submanager'].includes(role);
 
   useEffect(() => {
     document.documentElement.style.colorScheme = 'light';
@@ -42,11 +47,17 @@ export default function Customers() {
         fetchEntity('suppliers', setSuppliers)
       ]);
 
-      gsap.fromTo(
-        '.ledger-row',
-        { y: 14, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.35, stagger: 0.05, ease: 'power2.out' }
-      );
+      // Small timeout to ensure DOM update is complete
+      setTimeout(() => {
+        const rows = document.querySelectorAll('.ledger-row');
+        if (rows.length > 0) {
+          gsap.fromTo(
+            '.ledger-row',
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.5, stagger: 0.05, ease: 'power2.out' }
+          );
+        }
+      }, 50);
     } catch (err) {
       setError('Failed to load entries');
       console.error('Failed to fetch entries', err);
@@ -66,10 +77,10 @@ export default function Customers() {
     [entries, search]
   );
 
-  const totalReceivable = filtered.reduce((sum, item) => sum + (item.dues > 0 ? item.dues : 0), 0);
-  const totalPayable = 0;
+  const totalReceivable = customers.reduce((sum, item) => sum + (item.dues > 0 ? item.dues : 0), 0);
+  const totalPayable = suppliers.reduce((sum, item) => sum + (item.dues > 0 ? item.dues : 0), 0);
 
-  const formatCurrency = (value) => `Rs ${Math.round(Number(value || 0)).toLocaleString('en-IN')}`;
+  const formatCurrency = (value) => `₹${Math.round(Number(value || 0)).toLocaleString('en-IN')}`;
 
   const getInitials = (name) => {
     if (!name) return 'C';
@@ -175,12 +186,17 @@ export default function Customers() {
         </div>
       </header>
 
+      {isOwner && (
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-semibold text-slate-500">You will give</p>
             <p className="mt-1 text-3xl font-black tracking-tight text-slate-900">{formatCurrency(totalPayable)}</p>
-            <button type="button" className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-sky-700">
+            <button
+              type="button"
+              onClick={() => setShowReportModal(true)}
+              className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-sky-700 hover:text-sky-900 transition-colors"
+            >
               <FileText size={14} />
               View Report
             </button>
@@ -188,13 +204,18 @@ export default function Customers() {
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-semibold text-slate-500">You will get</p>
             <p className="mt-1 text-3xl font-black tracking-tight text-rose-600">{formatCurrency(totalReceivable)}</p>
-            <button type="button" className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-sky-700">
+            <button
+              type="button"
+              onClick={() => setShowReportModal(true)}
+              className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-sky-700 hover:text-sky-900 transition-colors"
+            >
               <Users size={14} />
               Open Cashbook
             </button>
           </div>
         </div>
       </section>
+      )}
 
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2">
@@ -209,15 +230,23 @@ export default function Customers() {
           <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500">
             <ArrowUpDown size={17} />
           </button>
-          <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500">
+          <button
+            type="button"
+            onClick={() => setShowReportModal(true)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500"
+          >
             <FileText size={17} />
           </button>
         </div>
 
         <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
           {filtered.map((item) => (
-            <div key={item._id} className="ledger-row group flex items-start justify-between gap-3 px-3 py-3.5">
-              <div className="flex min-w-0 items-center gap-3">
+            <div 
+              key={item._id} 
+              onClick={() => navigate(`/${activeTab}/${item._id}/ledger`)}
+              className="ledger-row group flex items-start justify-between gap-3 px-3 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors"
+            >
+              <div className="flex min-w-0 items-center gap-3 text-left">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500 text-lg font-black text-white">
                   {getInitials(item.name)}
                 </div>
@@ -228,7 +257,10 @@ export default function Customers() {
                   {isAdmin && (
                     <button
                       type="button"
-                      onClick={() => handleDelete(item._id, item.name)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(item._id, item.name);
+                      }}
                       className="mt-1 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-rose-600"
                     >
                       <Trash2 size={12} /> Delete
@@ -237,12 +269,14 @@ export default function Customers() {
                 </div>
               </div>
 
+              {isOwner && (
               <div className="shrink-0 text-right">
                 <p className={`text-2xl font-black leading-none ${item.dues > 0 ? 'text-rose-600' : 'text-slate-700'}`}>
                   {formatCurrency(item.dues)}
                 </p>
                 <p className="mt-1 text-[12px] font-semibold text-slate-500">{item.dues > 0 ? "You'll Get" : ''}</p>
               </div>
+              )}
             </div>
           ))}
         </div>
@@ -327,6 +361,104 @@ export default function Customers() {
                 Save {singularLabel}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Ledger Summary</h2>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Business Health Report</p>
+              </div>
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
+              {/* Main Balance */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100">
+                  <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Total Receivable</p>
+                  <p className="text-2xl font-black text-rose-700 mt-1">{formatCurrency(totalReceivable)}</p>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Payable</p>
+                  <p className="text-2xl font-black text-slate-900 mt-1">{formatCurrency(totalPayable)}</p>
+                </div>
+              </div>
+
+              {/* Counts */}
+              <div className="flex items-center justify-around py-4 border-y border-slate-100">
+                <div className="text-center">
+                  <p className="text-2xl font-black text-slate-900">{customers.length}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Customers</p>
+                </div>
+                <div className="w-px h-8 bg-slate-100" />
+                <div className="text-center">
+                  <p className="text-2xl font-black text-slate-900">{suppliers.length}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suppliers</p>
+                </div>
+              </div>
+
+              {/* Debtors List */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <ArrowUpDown size={14}/> Top Debtors
+                </h3>
+                <div className="space-y-2">
+                  {[...customers].sort((a,b) => b.dues - a.dues).slice(0, 3).map(c => (
+                    <div key={c._id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50/50 border border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-black text-white">
+                          {getInitials(c.name)}
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">{c.name}</span>
+                      </div>
+                      <span className="text-sm font-black text-rose-600">{formatCurrency(c.dues)}</span>
+                    </div>
+                  ))}
+                  {customers.length === 0 && <p className="text-xs text-slate-400 italic">No customer data available</p>}
+                </div>
+              </div>
+
+              {/* Creditors List */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <ArrowUpDown size={14} /> Top Creditors
+                </h3>
+                <div className="space-y-2">
+                  {[...suppliers].sort((a,b) => b.dues - a.dues).slice(0, 3).map(s => (
+                    <div key={s._id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50/50 border border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-400 flex items-center justify-center text-[10px] font-black text-white">
+                          {getInitials(s.name)}
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">{s.name}</span>
+                      </div>
+                      <span className="text-sm font-black text-slate-900">{formatCurrency(s.dues)}</span>
+                    </div>
+                  ))}
+                  {suppliers.length === 0 && <p className="text-xs text-slate-400 italic">No supplier data available</p>}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-900 text-center">
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="w-full py-3 rounded-xl bg-white text-slate-900 font-black uppercase tracking-widest text-xs hover:bg-slate-100 transition-colors"
+              >
+                Close Report
+              </button>
+            </div>
           </div>
         </div>
       )}

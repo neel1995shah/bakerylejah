@@ -48,13 +48,14 @@ export const authUser = async (req, res) => {
       if (user.lockUntil && user.lockUntil > new Date()) {
         const remainingMs = user.lockUntil.getTime() - Date.now();
         const remainingMinutes = Math.ceil(remainingMs / 60000);
+        console.warn(`User ${username} is locked for ${remainingMinutes} more minutes.`);
         return res.status(423).json({
           message: `Session suspended due to 3 wrong PIN attempts. Try again in ${remainingMinutes} minute(s).`
         });
       }
 
       const isMatch = await bcrypt.compare(String(pin), user.pin);
-      console.log(`PIN match: ${isMatch}`);
+      console.log(`PIN verification for ${username}: ${isMatch ? 'SUCCESS' : 'FAILED'}`);
       
       if (isMatch) {
         if (user.failedPinAttempts !== 0 || user.lockUntil) {
@@ -78,6 +79,7 @@ export const authUser = async (req, res) => {
         user.failedPinAttempts = 0;
         user.lockUntil = new Date(Date.now() + 30 * 60 * 1000);
         await user.save();
+        console.warn(`User ${username} locked due to too many failed attempts.`);
         return res.status(423).json({
           message: 'Session suspended for 30 minutes after 3 wrong PIN attempts.'
         });
@@ -89,6 +91,14 @@ export const authUser = async (req, res) => {
       });
     }
     
+    // Check if any users exist in the DB at all to provide better feedback
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      console.error('CRITICAL: No users found in database. Did you run the seed script?');
+    } else {
+      console.log(`Login failed: User "${username}" not found.`);
+    }
+
     res.status(401).json({ message: 'Invalid credentials' });
   } catch (error) {
     console.error(`Login error: ${error.message}`);

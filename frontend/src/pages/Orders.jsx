@@ -97,8 +97,7 @@ export default function Orders() {
     });
     socket.on('orderCreated', o => {
       setOrders(prev => [o, ...prev]);
-      const itemsText = o.items?.map(i => `${i.quantity} ${i.unitType} of ${i.productName}`).join(', ') || 'items';
-      addToast('order', `New order #${o._id.slice(-6).toUpperCase()} received`, 'New Order', `Customer: ${o.customer?.name || 'Walk-in'}\n${itemsText}\nTotal: $${o.totalAmount?.toFixed(2)}`);
+      addToast('order', `New order #${o._id.slice(-6).toUpperCase()} received`, 'New Order', `Customer: ${o.customer?.name || 'Walk-in'}\n${itemsText}\nTotal: ₹${(o.totalAmount || 0).toFixed(2)}`);
     });
     socket.on('workerAssigned', o => setOrders(prev => prev.map(old => old._id === o._id ? o : old)));
     socket.on('orderConfirmed', o => setOrders(prev => prev.map(old => old._id === o._id ? o : old)));
@@ -221,9 +220,12 @@ export default function Orders() {
   };
 
   const handleAddProductLine = () => {
-    const productName = draftProductName.trim();
-    if (!productName) {
-      alert('Please enter product name.');
+    const noteContent = draftNote.trim();
+    const productName = draftProductName.trim() || 'Item'; // Default to 'Item' if name is removed
+    
+    // If we have neither name nor note, don't add
+    if (!productName && !noteContent) {
+      alert('Please enter some details or notes.');
       return;
     }
 
@@ -444,7 +446,7 @@ export default function Orders() {
         )
       }
     },
-    { header: 'Amount', align: 'right', render: (r) => <span className="font-black text-primary">${r.totalAmount?.toFixed(2)}</span> }
+    { header: 'Amount', align: 'right', render: (r) => <span className="font-black text-primary">₹{(r.totalAmount || 0).toFixed(2)}</span> }
   ];
 
   return (
@@ -509,75 +511,25 @@ export default function Orders() {
           <div className="space-y-4">
             <div className="rounded-2xl border border-black/10 bg-white p-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-2 sm:col-span-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Product Name</label>
-                  <input
-                    type="text"
-                    list="order-product-list"
-                    value={draftProductName}
-                    onChange={(e) => setDraftProductName(e.target.value)}
-                    className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-bold text-primary outline-none"
-                    placeholder="Type product name"
-                  />
-                  <datalist id="order-product-list">
-                    {availableProducts.map((inv) => (
-                      <option key={inv._id} value={inv.product?.name || ''} />
-                    ))}
-                  </datalist>
-                </div>
+                {/* Product Name removed as requested */}
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Quantity</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={draftQty}
-                    onChange={(e) => setDraftQty(e.target.value)}
-                    className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-bold text-primary outline-none"
+
+                <div className="sm:col-span-2 space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Notes</label>
+                  <textarea
+                    rows={2}
+                    value={draftNote}
+                    onChange={(e) => setDraftNote(e.target.value)}
+                    placeholder="Add special instructions or notes..."
+                    className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-bold text-primary outline-none placeholder:text-primary/30 resize-none"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Unit</label>
-                  <select
-                    value={draftUnit}
-                    onChange={(e) => setDraftUnit(e.target.value)}
-                    className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-bold text-primary outline-none"
-                  >
-                    <option value="qty">QTY</option>
-                    <option value="kg">KG</option>
-                    <option value="grams">GRAMS</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2 sm:col-span-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Price</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={draftPrice}
-                    onChange={(e) => setDraftPrice(e.target.value)}
-                    className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-bold text-primary outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const note = window.prompt('Add product note', draftNote || '');
-                      if (note !== null) setDraftNote(note);
-                    }}
-                    className="rounded-xl border border-black/10 bg-yellow-100 px-3 py-2 text-xs font-black uppercase tracking-wider text-primary"
-                  >
-                    Add Note
-                  </button>
-                  {draftNote && <p className="text-xs font-semibold text-primary/60">Note set</p>}
+                <div className="sm:col-span-2 flex justify-end pt-2">
                   <button
                     type="button"
                     onClick={handleAddProductLine}
-                    className="sm:ml-auto rounded-xl bg-primary px-4 py-2 text-xs font-black uppercase tracking-wider text-secondary"
+                    className="rounded-xl bg-primary px-6 py-2.5 text-xs font-black uppercase tracking-wider text-secondary shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
                   >
                     Add Product
                   </button>
@@ -605,7 +557,7 @@ export default function Orders() {
                 <div key={item.key} className="rounded-2xl border border-black/10 bg-white p-4">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <p className="font-black text-primary tracking-tight">{item.productName || item.product?.name}</p>
-                    <p className="font-black text-primary">${item.price.toFixed(2)}</p>
+                    <p className="font-black text-primary">₹{(item.price || 0).toFixed(2)}</p>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -619,33 +571,18 @@ export default function Orders() {
                       </button>
                     </div>
 
-                    <select
-                      value={item.unitType}
-                      onChange={(e) => updateCartUnit(item.key, e.target.value)}
-                      className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-bold text-primary outline-none"
-                    >
-                      <option value="qty">QTY</option>
-                      <option value="kg">KG</option>
-                      <option value="grams">GRAMS</option>
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const note = window.prompt(`Add note for ${item.productName || item.product?.name}`, item.note || '');
-                        if (note !== null) updateCartNote(item.key, note);
-                      }}
-                      className="rounded-xl border border-black/10 bg-yellow-100 px-3 py-2 text-sm font-black uppercase tracking-wider text-primary"
-                    >
-                      Add Note
-                    </button>
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/10 p-2 sm:col-span-2">
+                       <span className="w-full text-center text-[10px] font-black uppercase text-primary/60 tracking-widest">Added Product</span>
+                    </div>
                   </div>
 
-                  {item.note && (
-                    <p className="mt-2 rounded-lg bg-primary/5 px-3 py-2 text-xs font-semibold text-primary/70">
-                      Note: {item.note}
-                    </p>
-                  )}
+                  <input
+                    type="text"
+                    value={item.note || ''}
+                    onChange={(e) => updateCartNote(item.key, e.target.value)}
+                    placeholder="Add a note..."
+                    className="mt-2 w-full rounded-xl border border-black/10 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary outline-none placeholder:text-primary/30"
+                  />
                 </div>
               ))}
             </div>
@@ -653,7 +590,7 @@ export default function Orders() {
             <div className="rounded-2xl border border-black/10 bg-primary/5 px-4 py-3">
               <div className="flex items-end justify-between">
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40">Total</span>
-                <span className="text-3xl font-black tracking-tighter text-primary">${cartTotal.toFixed(2)}</span>
+                <span className="text-3xl font-black tracking-tighter text-primary">₹{(cartTotal || 0).toFixed(2)}</span>
               </div>
             </div>
 

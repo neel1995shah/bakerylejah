@@ -1,5 +1,6 @@
 import Order from '../models/Order.js';
 import Customer from '../models/Customer.js';
+import Ledger from '../models/Ledger.js';
 import { io } from '../index.js';
 
 export const createOrder = async (req, res) => {
@@ -51,7 +52,21 @@ export const createOrder = async (req, res) => {
 
     const createdOrder = await order.save();
     
-    await Customer.findByIdAndUpdate(resolvedCustomerId, { $inc: { dues: totalAmount } });
+    const customer = await Customer.findByIdAndUpdate(
+      resolvedCustomerId, 
+      { $inc: { dues: totalAmount } },
+      { new: true }
+    );
+
+    // Create a ledger entry for the "GAVE" (Credit sale)
+    await Ledger.create({
+      customer: customer._id,
+      amount: totalAmount,
+      type: 'gave',
+      runningBalance: customer.dues,
+      note: `Order #${createdOrder._id.toString().slice(-6).toUpperCase()}`,
+      order: createdOrder._id
+    });
 
     const populatedOrder = await Order.findById(createdOrder._id)
       .populate('customer')

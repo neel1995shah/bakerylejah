@@ -7,6 +7,7 @@ import WorkerDashboard from './pages/WorkerDashboard.jsx';
 import Orders from './pages/Orders.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Customers from './pages/Customers.jsx';
+import CustomerLedger from './pages/CustomerLedger.jsx';
 import Notifications from './pages/Notifications.jsx';
 import StockRegistration from './pages/StockRegistration.jsx';
 import CustomerNeed from './pages/CustomerNeed.jsx';
@@ -56,6 +57,18 @@ export default function App() {
           <Route path="/customers" element={
             <ProtectedRoute allowedRole={adminRoles}>
               <Customers />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/customers/:id/ledger" element={
+            <ProtectedRoute allowedRole={adminRoles}>
+              <CustomerLedger />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/suppliers/:id/ledger" element={
+            <ProtectedRoute allowedRole={adminRoles}>
+              <CustomerLedger />
             </ProtectedRoute>
           } />
 

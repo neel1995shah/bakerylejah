@@ -78,7 +78,7 @@ export default function ManagerDashboard() {
           {orders.length > 0 ? orders.map((o, i) => (
             <li key={i}>
               <strong>Order #{o._id.slice(-4)}</strong> - 
-              Customer Dues: ${o.totalAmount} - 
+              Customer Dues: ₹{o.totalAmount} - 
               Status: <span style={{color: 'var(--secondary)'}}>{o.deliveryStatus}</span> - 
               Worker: {o.assignedWorker?.username || 'Unassigned'}
             </li>

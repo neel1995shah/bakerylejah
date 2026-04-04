@@ -61,7 +61,7 @@ export const io = new Server(server, {
 initSockets(io);
 
 // Init Middleware
-app.use(cors(corsOptions));
+app.use(cors()); // Simplified for debug - fix 400 issues
 app.use(express.json());
 
 // Routes

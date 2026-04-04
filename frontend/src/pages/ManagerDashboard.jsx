@@ -121,7 +121,7 @@ export default function ManagerDashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-black text-primary text-sm sm:text-base">${o.totalAmount.toFixed(2)}</p>
+                  <p className="font-black text-primary text-sm sm:text-base">₹{(o.totalAmount || 0).toFixed(2)}</p>
                   <span className={`inline-block px-2 py-0.5 text-[10px] font-black rounded-full mt-1 uppercase tracking-tighter ${getStatusColor(o.deliveryStatus)}`}>
                     {o.deliveryStatus}
                   </span>
