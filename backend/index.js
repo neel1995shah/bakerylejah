@@ -17,6 +17,7 @@ import supplierRoutes from './routes/supplierRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import stockAlertRoutes from './routes/stockAlertRoutes.js';
 import customerNeedRoutes from './routes/customerNeedRoutes.js';
+import transactionRoutes from './routes/transactionRoutes.js';
 
 import { initSockets } from './sockets/index.js';
 
@@ -74,6 +75,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/stock-alerts', stockAlertRoutes);
 app.use('/api/customer-needs', customerNeedRoutes);
+app.use('/api/transactions', transactionRoutes);
 
 const PORT = process.env.PORT || 5000;
 

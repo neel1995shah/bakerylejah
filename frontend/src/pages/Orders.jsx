@@ -20,13 +20,10 @@ export default function Orders() {
   const [deliverySelections, setDeliverySelections] = useState({});
 
   // POS State
-  const [cart, setCart] = useState([]);
-  const [draftProductName, setDraftProductName] = useState('');
-  const [draftQty, setDraftQty] = useState('1');
-  const [draftUnit, setDraftUnit] = useState('qty');
-  const [draftNote, setDraftNote] = useState('');
-  const [draftPrice, setDraftPrice] = useState('0');
+  const [orderNotes, setOrderNotes] = useState('');
+  const [manualAmount, setManualAmount] = useState('');
   const [createDeliverySelection, setCreateDeliverySelection] = useState('');
+
   const [customerForm, setCustomerForm] = useState({
     name: '',
     phone: '',
@@ -113,6 +110,9 @@ export default function Orders() {
     socket.on('deliveryStarted', o => setOrders(prev => prev.map(old => old._id === o._id ? o : old)));
     socket.on('deliveryCompleted', o => setOrders(prev => prev.map(old => old._id === o._id ? o : old)));
     socket.on('stockUpdated', inv => setInventory(prev => prev.map(old => old._id === inv._id ? inv : old)));
+    socket.on('orderDeleted', orderId => {
+      setOrders(prev => prev.filter(o => o._id !== orderId));
+    });
 
     return () => socket.disconnect();
   }, [navigate]);
@@ -167,111 +167,15 @@ export default function Orders() {
 
   const handleMarkDelivered = async (orderId) => {
     try {
-      const res = await axios.put(`/api/orders/${orderId}/status`, { status: 'delivered' });
-      setOrders(prev => prev.map(old => old._id === orderId ? res.data : old));
-      addToast('success', `Order #${orderId.slice(-6).toUpperCase()} marked as delivered`, 'Order Completed');
+      await axios.put(`/api/orders/${orderId}/status`, { status: 'delivered' });
+      setOrders(prev => prev.filter(o => o._id !== orderId));
+      addToast('success', `Order #${orderId.slice(-6).toUpperCase()} marked as delivered and removed`, 'Order Completed');
+
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to mark order as delivered');
     }
   };
 
-  const addToCart = (invItem, quantity, unitType, note, manualName, manualPrice) => {
-    const isCustom = !invItem;
-    if (!isCustom && invItem.quantity <= 0) return;
-
-    const qtyToAdd = Number(quantity);
-    if (!qtyToAdd || qtyToAdd <= 0) return;
-
-    const linePrice = Number(manualPrice ?? invItem?.product?.basePrice ?? 0);
-
-    const key = isCustom
-      ? `custom:${String(manualName || '').trim().toLowerCase()}`
-      : invItem.product._id;
-
-    setCart(prev => {
-      const existing = prev.find(item => item.key === key);
-      if (existing) {
-        if (!isCustom && existing.cartQty + qtyToAdd > invItem.quantity) return prev;
-        return prev.map(item => item.key === key ? {
-          ...item,
-          cartQty: item.cartQty + qtyToAdd,
-          unitType,
-          note: note || item.note,
-          price: linePrice
-        } : item);
-      }
-
-      if (!isCustom && qtyToAdd > invItem.quantity) return prev;
-
-      const normalizedName = isCustom
-        ? String(manualName || '').trim()
-        : invItem.product.name;
-
-      return [...prev, {
-        key,
-        product: isCustom ? null : invItem.product,
-        productName: normalizedName,
-        cartQty: qtyToAdd,
-        price: linePrice,
-        unitType,
-        note: note || ''
-      }];
-    });
-  };
-
-  const handleAddProductLine = () => {
-    const noteContent = draftNote.trim();
-    const productName = draftProductName.trim() || 'Item'; // Default to 'Item' if name is removed
-    
-    // If we have neither name nor note, don't add
-    if (!productName && !noteContent) {
-      alert('Please enter some details or notes.');
-      return;
-    }
-
-    const invItem = inventory.find((i) => (i.product?.name || '').toLowerCase() === productName.toLowerCase());
-
-    if (!invItem) {
-      addToCart(null, draftQty, draftUnit, draftNote, productName, draftPrice);
-      setDraftProductName('');
-      setDraftQty('1');
-      setDraftUnit('qty');
-      setDraftNote('');
-      setDraftPrice('0');
-      return;
-    }
-
-    addToCart(invItem, draftQty, draftUnit, draftNote, productName, invItem.product?.basePrice || 0);
-    setDraftProductName('');
-    setDraftQty('1');
-    setDraftUnit('qty');
-    setDraftNote('');
-    setDraftPrice('0');
-  };
-
-  const updateCartQty = (productId, delta) => {
-    setCart(prev => prev.map(item => {
-      if (item.key === productId) {
-        const newQty = item.cartQty + delta;
-        return newQty > 0 ? { ...item, cartQty: newQty } : item;
-      }
-      return item;
-    }).filter(item => item.cartQty > 0));
-  };
-
-  const updateCartUnit = (productId, unitType) => {
-    setCart(prev => prev.map(item => (
-      item.key === productId ? { ...item, unitType } : item
-    )));
-  };
-
-  const updateCartNote = (productId, note) => {
-    setCart(prev => prev.map(item => (
-      item.key === productId ? { ...item, note } : item
-    )));
-  };
-
-  const cartTotal = cart.reduce((sum, item) => sum + (item.cartQty * item.price), 0);
 
   const handleCreateOrder = async () => {
     const token = localStorage.getItem('token');
@@ -285,29 +189,29 @@ export default function Orders() {
     const phone = customerForm.phone.trim();
     const address = customerForm.address.trim();
 
-    if (!name || !phone || !address) {
-      alert('Customer name, phone number, and address are required.');
+    if (!orderNotes.trim()) {
+      alert('Order notes/description are required.');
       return;
     }
 
-    if (cart.length === 0) {
-      alert('Please add at least one product.');
+    const totalVal = Number(manualAmount);
+    if (!totalVal || totalVal <= 0) {
+      alert('Please enter a valid total amount.');
       return;
     }
 
     try {
       const orderRes = await axios.post('/api/orders', {
         customerData: { name, phone, address },
-        totalAmount: cartTotal,
-        items: cart.map(c => ({
-          product: c.product?._id,
-          productName: c.productName || c.product?.name,
-          quantity: c.cartQty,
-          price: c.price,
-          unitType: c.unitType,
-          note: c.note
-        }))
+        totalAmount: totalVal,
+        items: [{
+          productName: 'General Order', // Placeholder name
+          quantity: 1,
+          price: totalVal,
+          note: orderNotes
+        }]
       });
+
 
       if (createDeliverySelection) {
         const payload = createDeliverySelection === 'by_self'
@@ -317,9 +221,10 @@ export default function Orders() {
       }
 
       setPOSModalOpen(false);
-      setCustomerForm({ name: '', phone: '', address: '' });
+      setOrderNotes('');
+      setManualAmount('');
       setCreateDeliverySelection('');
-      setCart([]);
+
     } catch (err) {
       if (err?.response?.status === 401) {
         alert('Session expired. Please login again.');
@@ -509,30 +414,30 @@ export default function Orders() {
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-2xl border border-black/10 bg-white p-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {/* Product Name removed as requested */}
+            <div className="rounded-2xl border border-black/10 bg-white p-5 space-y-4">
+              <h4 className="text-sm font-black uppercase tracking-[0.2em] text-primary/50">Order Summary</h4>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Order Details / Notes</label>
+                <textarea
+                  value={orderNotes}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                  placeholder="Describe the order (e.g. 5kg Cake, Generic Supplies...)"
+                  className="min-h-[120px] w-full rounded-2xl border border-black/10 bg-white p-4 font-bold text-primary outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
+              </div>
 
-
-                <div className="sm:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Notes</label>
-                  <textarea
-                    rows={2}
-                    value={draftNote}
-                    onChange={(e) => setDraftNote(e.target.value)}
-                    placeholder="Add special instructions or notes..."
-                    className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-bold text-primary outline-none placeholder:text-primary/30 resize-none"
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-primary/40">Total Amount (₹)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-primary text-xl">₹</span>
+                  <input
+                    type="number"
+                    value={manualAmount}
+                    onChange={(e) => setManualAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full rounded-2xl border border-black/10 bg-white p-4 pl-10 text-2xl font-black text-primary outline-none focus:ring-2 focus:ring-primary"
                   />
-                </div>
-
-                <div className="sm:col-span-2 flex justify-end pt-2">
-                  <button
-                    type="button"
-                    onClick={handleAddProductLine}
-                    className="rounded-xl bg-primary px-6 py-2.5 text-xs font-black uppercase tracking-wider text-secondary shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
-                  >
-                    Add Product
-                  </button>
                 </div>
               </div>
             </div>
@@ -552,55 +457,12 @@ export default function Orders() {
               </select>
             </div>
 
-            <div className="space-y-3">
-              {cart.map((item) => (
-                <div key={item.key} className="rounded-2xl border border-black/10 bg-white p-4">
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <p className="font-black text-primary tracking-tight">{item.productName || item.product?.name}</p>
-                    <p className="font-black text-primary">₹{(item.price || 0).toFixed(2)}</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-2">
-                      <button type="button" onClick={() => updateCartQty(item.key, -1)} className="rounded-lg p-2 hover:bg-white">
-                        <Minus size={14} />
-                      </button>
-                      <span className="w-full text-center text-sm font-black">{item.cartQty}</span>
-                      <button type="button" onClick={() => updateCartQty(item.key, 1)} className="rounded-lg p-2 hover:bg-white">
-                        <Plus size={14} />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 rounded-xl bg-primary/10 p-2 sm:col-span-2">
-                       <span className="w-full text-center text-[10px] font-black uppercase text-primary/60 tracking-widest">Added Product</span>
-                    </div>
-                  </div>
-
-                  <input
-                    type="text"
-                    value={item.note || ''}
-                    onChange={(e) => updateCartNote(item.key, e.target.value)}
-                    placeholder="Add a note..."
-                    className="mt-2 w-full rounded-xl border border-black/10 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary outline-none placeholder:text-primary/30"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="rounded-2xl border border-black/10 bg-primary/5 px-4 py-3">
-              <div className="flex items-end justify-between">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40">Total</span>
-                <span className="text-3xl font-black tracking-tighter text-primary">₹{(cartTotal || 0).toFixed(2)}</span>
-              </div>
-            </div>
-
             <button
               type="button"
               onClick={handleCreateOrder}
-              className="btn-primary w-full py-5 text-base"
-              disabled={cart.length === 0}
+              className="btn-primary w-full py-5 text-base shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
-              <ShoppingCart size={18} /> Create Order
+              <ShoppingCart size={18} /> CONFIRM ORDER
             </button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import Order from '../models/Order.js';
 import Customer from '../models/Customer.js';
-import Ledger from '../models/Ledger.js';
+import Transaction from '../models/Transaction.js';
 import { io } from '../index.js';
 
 export const createOrder = async (req, res) => {
@@ -58,15 +58,16 @@ export const createOrder = async (req, res) => {
       { new: true }
     );
 
-    // Create a ledger entry for the "GAVE" (Credit sale)
-    await Ledger.create({
-      customer: customer._id,
+    // Create a transaction entry for the "GAVE" (Credit sale)
+    await Transaction.create({
+      entityType: 'customer',
+      entityId: customer._id,
       amount: totalAmount,
-      type: 'gave',
-      runningBalance: customer.dues,
-      note: `Order #${createdOrder._id.toString().slice(-6).toUpperCase()}`,
-      order: createdOrder._id
+      type: 'you_gave',
+      balanceAfter: customer.dues,
+      note: `Order #${createdOrder._id.toString().slice(-6).toUpperCase()}`
     });
+
 
     const populatedOrder = await Order.findById(createdOrder._id)
       .populate('customer')
@@ -136,9 +137,18 @@ export const updateDeliveryStatus = async (req, res) => {
       io.to('manager').emit('deliveryStarted', order);
       io.to('worker').emit('deliveryStarted', order);
     } else if (status === 'delivered') {
+      // Auto-delete delivered item as requested
+      await Order.findByIdAndDelete(id);
+      io.to('manager').emit('orderDeleted', id);
+      io.to('worker').emit('orderDeleted', id);
+      io.to('owner').emit('orderDeleted', id);
+      io.to('sub_manager').emit('orderDeleted', id);
+      
+      // Still emit deliveryCompleted for any final notifications
       io.to('manager').emit('deliveryCompleted', order);
       io.to('worker').emit('deliveryCompleted', order);
     }
+
 
     res.json(order);
   } catch (error) {

@@ -1,5 +1,6 @@
 import Supplier from '../models/Supplier.js';
-import Ledger from '../models/Ledger.js';
+import Transaction from '../models/Transaction.js';
+
 
 export const getSuppliers = async (req, res) => {
   try {
@@ -22,20 +23,26 @@ export const getSupplierById = async (req, res) => {
 
 export const createSupplier = async (req, res) => {
   try {
-    const { name, phone, address, dues } = req.body;
-    const initialDues = Number(dues || 0);
+    const { name, phone, address, initialAmount, initialType } = req.body;
 
-    const supplier = new Supplier({ name, phone, address, dues: initialDues });
+    const amount = Number(initialAmount) || 0;
+    let dues = 0;
+    if (amount > 0 && initialType) {
+      dues = initialType === 'you_got' ? amount : -amount;
+    }
+
+    const supplier = new Supplier({ name, phone, address, dues });
     const savedSupplier = await supplier.save();
 
-    if (initialDues > 0) {
-      await Ledger.create({
-        supplier: savedSupplier._id,
-        amount: initialDues,
-        type: 'gave',
+    if (amount > 0 && initialType) {
+      await new Transaction({
+        entityType: 'supplier',
+        entityId: savedSupplier._id,
+        type: initialType,
+        amount,
         note: 'Opening Balance',
-        runningBalance: initialDues
-      });
+        balanceAfter: dues
+      }).save();
     }
 
     res.status(201).json(savedSupplier);
@@ -59,56 +66,4 @@ export const deleteSupplier = async (req, res) => {
   }
 };
 
-export const getSupplierLedger = async (req, res) => {
-  try {
-    const { id } = req.params;
-    let ledger = await Ledger.find({ supplier: id }).sort({ createdAt: -1 });
-    
-    // Virtual Opening Balance if no entries but dues exist
-    if (ledger.length === 0) {
-      const supplier = await Supplier.findById(id);
-      if (supplier && supplier.dues > 0) {
-        ledger = [{
-          _id: 'virtual-opening',
-          supplier: id,
-          amount: supplier.dues,
-          type: 'gave',
-          note: 'Opening Balance',
-          runningBalance: supplier.dues,
-          createdAt: supplier.createdAt
-        }];
-      }
-    }
 
-    res.json(ledger);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const addSupplierLedgerEntry = async (req, res) => {
-  const { amount, type, note } = req.body;
-  const { id } = req.params;
-
-  try {
-    const supplier = await Supplier.findById(id);
-    if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
-
-    // Note: For suppliers, 'gave' (you paid them) decreases your debt, 'got' (they gave stock) increases it.
-    const change = type === 'got' ? amount : -amount;
-    supplier.dues = (supplier.dues || 0) + change;
-    await supplier.save();
-
-    const entry = await Ledger.create({
-      supplier: id,
-      amount,
-      type,
-      note,
-      runningBalance: supplier.dues
-    });
-
-    res.status(201).json(entry);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
