@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const PLEntry = require('../models/PLEntry');
 const User = require('../models/User');
+const { JWT_SECRET } = require('../config/jwt');
 
 const router = express.Router();
 const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
@@ -41,7 +42,7 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.userId = decoded.userId;
     req.username = decoded.username;
     next();

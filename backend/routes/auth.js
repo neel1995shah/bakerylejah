@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { JWT_SECRET } = require('../config/jwt');
 const router = express.Router();
 
 // Login endpoint
@@ -25,7 +26,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Create JWT token
-    const token = jwt.sign({ userId: user._id, username: user.username }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ userId: user._id, username: user.username }, JWT_SECRET, {
       expiresIn: '24h'
     });
 

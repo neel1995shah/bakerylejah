@@ -1,5 +1,7 @@
 const express = require('express');
 const Transaction = require('../models/Transaction');
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../config/jwt');
 const router = express.Router();
 
 // Middleware to verify token
@@ -10,7 +12,7 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
-    const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.userId = decoded.userId;
     next();
   } catch (err) {
