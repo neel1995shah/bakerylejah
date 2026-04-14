@@ -4,6 +4,7 @@
   "description": "Backend for Bakery Financial Management System",
   "main": "server.js",
   "scripts": {
+    "build": "node -e \"console.log('No backend build step required')\"",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },

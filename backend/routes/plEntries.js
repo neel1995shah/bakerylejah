@@ -3,6 +3,23 @@ const jwt = require('jsonwebtoken');
 const PLEntry = require('../models/PLEntry');
 
 const router = express.Router();
+const FIRM_NAMES = ['krish', 'harsh', 'meet'];
+
+const isFirmMember = (username) => FIRM_NAMES.includes((username || '').toLowerCase().trim());
+
+const buildScopeQuery = (req, extraQuery = {}) => {
+  if (isFirmMember(req.username)) {
+    return {
+      ...extraQuery,
+      handler: { $in: FIRM_NAMES }
+    };
+  }
+
+  return {
+    ...extraQuery,
+    userId: req.userId
+  };
+};
 
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -22,7 +39,7 @@ const verifyToken = (req, res, next) => {
 
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const entries = await PLEntry.find({}).sort({ date: -1, createdAt: -1 });
+    const entries = await PLEntry.find(buildScopeQuery(req)).sort({ date: -1, createdAt: -1 });
 
     const totals = entries.reduce(
       (acc, row) => {
@@ -67,6 +84,8 @@ router.post('/', verifyToken, async (req, res) => {
       in: safeIn,
       out: safeOut,
       charges: safeCharges,
+      settled: false,
+      settledAt: null,
       netProfit
     });
 
@@ -100,8 +119,18 @@ router.put('/:id', verifyToken, async (req, res) => {
 
     const netProfit = safeOut - safeIn - safeCharges;
 
+    const existingEntry = await PLEntry.findOne(buildScopeQuery(req, { _id: req.params.id }));
+
+    if (!existingEntry) {
+      return res.status(404).json({ message: 'P&L entry not found' });
+    }
+
+    if (existingEntry.settled) {
+      return res.status(400).json({ message: 'Settled entries cannot be edited' });
+    }
+
     const entry = await PLEntry.findOneAndUpdate(
-      { _id: req.params.id, userId: req.userId },
+      buildScopeQuery(req, { _id: req.params.id }),
       {
         date,
         handler,
@@ -114,10 +143,6 @@ router.put('/:id', verifyToken, async (req, res) => {
       { new: true }
     );
 
-    if (!entry) {
-      return res.status(404).json({ message: 'P&L entry not found' });
-    }
-
     req.app.get('io').emit('realtime-update', {
       action: 'updated an entry',
       user: req.username,
@@ -127,6 +152,34 @@ router.put('/:id', verifyToken, async (req, res) => {
     return res.json(entry);
   } catch (err) {
     return res.status(500).json({ message: 'Error updating P&L entry', error: err.message });
+  }
+});
+
+router.put('/:id/settle', verifyToken, async (req, res) => {
+  try {
+    const entry = await PLEntry.findOne(buildScopeQuery(req, { _id: req.params.id }));
+
+    if (!entry) {
+      return res.status(404).json({ message: 'P&L entry not found' });
+    }
+
+    if (entry.settled) {
+      return res.status(400).json({ message: 'Entry is already settled' });
+    }
+
+    entry.settled = true;
+    entry.settledAt = new Date();
+    await entry.save();
+
+    req.app.get('io').emit('realtime-update', {
+      action: 'settled an entry',
+      user: req.username,
+      module: 'P&L'
+    });
+
+    return res.json(entry);
+  } catch (err) {
+    return res.status(500).json({ message: 'Error settling P&L entry', error: err.message });
   }
 });
 

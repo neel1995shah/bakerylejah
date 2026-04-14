@@ -19,10 +19,12 @@ const Accounts = ({ token, username }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('handler-asc');
+  const [hasLoadedAccounts, setHasLoadedAccounts] = useState(false);
 
   useEffect(() => {
     const savedAccounts = localStorage.getItem(STORAGE_KEY);
     if (!savedAccounts) {
+      setHasLoadedAccounts(true);
       return;
     }
 
@@ -33,14 +35,21 @@ const Accounts = ({ token, username }) => {
       }
     } catch (err) {
       setMessage('Could not load saved accounts.');
+    } finally {
+      setHasLoadedAccounts(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!hasLoadedAccounts) {
+      return;
+    }
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(allAccounts));
     const visibleAccounts = filterByScope(allAccounts, username, 'handler');
-    setAccounts(visibleAccounts);
-  }, [allAccounts, username]);
+    // Fallback: show all saved rows if strict scope filtering produces an empty view.
+    setAccounts(visibleAccounts.length > 0 ? visibleAccounts : allAccounts);
+  }, [allAccounts, username, hasLoadedAccounts]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(accounts.length / PAGE_SIZE));
@@ -349,7 +358,7 @@ const Accounts = ({ token, username }) => {
             {sortedAccounts.length === 0 ? (
               <tr>
                 <td colSpan="5" className="no-data">
-                  No account fields match the current search.
+                  {allAccounts.length === 0 ? 'No account fields added yet.' : 'No account fields match the current search.'}
                 </td>
               </tr>
             ) : (

@@ -179,6 +179,10 @@ const PAndL = ({ token, username }) => {
 
   const handleOpenEdit = (row) => {
     setMessage('');
+    if (row.settled) {
+      setMessage('Settled entries cannot be edited.');
+      return;
+    }
     setEditingEntryId(row._id);
     setFormData({
       date: row.date ? new Date(row.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -191,6 +195,18 @@ const PAndL = ({ token, username }) => {
     setShowForm(true);
   };
 
+  const handleSettle = async (entryId) => {
+    setMessage('');
+
+    try {
+      await apiClient.put(`/api/pl-entries/${entryId}/settle`);
+      await fetchEntries();
+      setMessage('P&L entry settled successfully.');
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Failed to settle P&L entry.');
+    }
+  };
+
   const filteredEntries = entries.filter((row) => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) {
@@ -198,7 +214,7 @@ const PAndL = ({ token, username }) => {
     }
 
     const dateText = new Date(row.date).toLocaleDateString('en-GB');
-    return [row.handler, row.acc, row.in, row.out, row.charges, row.netProfit, dateText]
+    return [row.handler, row.acc, row.in, row.out, row.charges, row.netProfit, dateText, row.settled ? 'settled' : 'open']
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query));
   });
@@ -294,6 +310,7 @@ const PAndL = ({ token, username }) => {
               <th>Win</th>
               <th>Charges</th>
               <th>Net Profit</th>
+              <th>Status</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -307,10 +324,11 @@ const PAndL = ({ token, username }) => {
                 <strong>{filteredTotals.totalNetProfit.toFixed(2)}</strong>
               </td>
               <td />
+              <td />
             </tr>
             {sortedEntries.length > 0 ? (
               paginatedEntries.map((row) => (
-                <tr key={row._id}>
+                <tr key={row._id} className={row.settled ? 'account-row-inactive' : ''}>
                   <td>{new Date(row.date).toLocaleDateString('en-GB')}</td>
                   <td>{row.handler}</td>
                   <td>{row.acc}</td>
@@ -319,15 +337,33 @@ const PAndL = ({ token, username }) => {
                   <td>{row.charges || 0}</td>
                   <td className={row.netProfit >= 0 ? 'income-text' : 'expense-text'}>{row.netProfit || 0}</td>
                   <td>
-                    <button type="button" className="edit-btn" onClick={() => handleOpenEdit(row)}>
+                    <span className={`status-chip ${row.settled ? 'inactive' : 'active'}`}>
+                      {row.settled ? 'Settled' : 'Open'}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="edit-btn"
+                      onClick={() => handleOpenEdit(row)}
+                      disabled={row.settled}
+                    >
                       Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-btn"
+                      onClick={() => handleSettle(row._id)}
+                      disabled={row.settled}
+                    >
+                      Settle
                     </button>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="no-data">No P&L rows match the current search.</td>
+                <td colSpan="9" className="no-data">No P&L rows match the current search.</td>
               </tr>
             )}
           </tbody>

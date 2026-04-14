@@ -38,6 +38,14 @@ const plEntrySchema = new mongoose.Schema({
     min: 0,
     default: 0
   },
+  settled: {
+    type: Boolean,
+    default: false
+  },
+  settledAt: {
+    type: Date,
+    default: null
+  },
   netProfit: {
     type: Number,
     required: true,

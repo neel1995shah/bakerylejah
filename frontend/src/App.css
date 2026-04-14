@@ -412,7 +412,7 @@ h3 {
   color: #5f6b7a;
 }
 
-.accounts-table .danger-btn {
+.danger-btn {
   border: none;
   border-radius: 6px;
   padding: 0.42rem 0.72rem;
@@ -422,8 +422,8 @@ h3 {
   cursor: pointer;
 }
 
-.accounts-table .danger-btn:hover,
-.accounts-table .status-chip:hover {
+.danger-btn:hover,
+.status-chip:hover {
   filter: brightness(0.95);
 }
 

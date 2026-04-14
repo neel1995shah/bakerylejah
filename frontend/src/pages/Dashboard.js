@@ -8,6 +8,7 @@ const Dashboard = ({ token, username }) => {
   const [loading, setLoading] = useState(true);
   const [dashboardStats, setDashboardStats] = useState({ in: 0, out: 0, charges: 0, netProfit: 0, ledgerBalance: 0 });
   const [accountStats, setAccountStats] = useState({ total: 0, active: 0, inactive: 0 });
+  const [nonSettledEntries, setNonSettledEntries] = useState([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -24,9 +25,10 @@ const Dashboard = ({ token, username }) => {
         const visiblePlEntries = filterByScope(plEntries, username, 'handler');
         const visibleLedgerEntries = filterByScope(ledgerEntries, username, 'name');
 
+        const nonSettledVisiblePlEntries = visiblePlEntries.filter((entry) => !entry.settled);
         const scopedStats = { in: 0, out: 0, charges: 0, netProfit: 0, ledgerBalance: 0 };
 
-        visiblePlEntries.forEach(entry => {
+        nonSettledVisiblePlEntries.forEach(entry => {
           const inVal = Number(entry.in || 0);
           const outVal = Number(entry.out || 0);
           const chgVal = Number(entry.charges || 0);
@@ -44,6 +46,12 @@ const Dashboard = ({ token, username }) => {
         });
 
         setDashboardStats(scopedStats);
+        setNonSettledEntries(
+          nonSettledVisiblePlEntries
+            .slice()
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 50)
+        );
 
         // Fetch Accounts from Local Storage and explicitly scope them as well
         const savedAccounts = localStorage.getItem('gamdom-accounts');
@@ -124,6 +132,44 @@ const Dashboard = ({ token, username }) => {
           <h3>Inactive Accounts</h3>
           <p className="amount">{accountStats.inactive}</p>
         </div>
+      </div>
+
+      <h2 style={{ marginTop: '2.5rem' }}>Non-Settled P&L Entries</h2>
+      <div className="table-container">
+        <table className="ledger-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Handler</th>
+              <th>Acc</th>
+              <th>Bet</th>
+              <th>Win</th>
+              <th>Charges</th>
+              <th>Net Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {nonSettledEntries.length > 0 ? (
+              nonSettledEntries.map((entry) => (
+                <tr key={entry._id}>
+                  <td>{new Date(entry.date).toLocaleDateString('en-GB')}</td>
+                  <td>{entry.handler}</td>
+                  <td>{entry.acc}</td>
+                  <td>{Number(entry.in || 0).toFixed(2).replace(/\.00$/, '')}</td>
+                  <td>{Number(entry.out || 0).toFixed(2).replace(/\.00$/, '')}</td>
+                  <td>{Number(entry.charges || 0).toFixed(2).replace(/\.00$/, '')}</td>
+                  <td className={Number(entry.netProfit || 0) >= 0 ? 'income-text' : 'expense-text'}>
+                    {Number(entry.netProfit || 0).toFixed(2).replace(/\.00$/, '')}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="7" className="no-data">No non-settled P&L entries.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
