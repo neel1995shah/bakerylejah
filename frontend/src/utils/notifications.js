@@ -1,0 +1,54 @@
+import { toast } from 'react-toastify';
+import { isFirmMember } from './auth';
+
+export const requestNativePermissions = () => {
+  if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+    Notification.requestPermission().catch(err => console.warn('Notification permission dismissed:', err));
+  }
+};
+
+export const handleNotificationPulse = (payload, currentUser) => {
+  const { action, user, module } = payload;
+  
+  if (!user || !currentUser) return false;
+  
+  // If the person who did the action is me, do not notify me
+  if (user.toLowerCase() === currentUser.toLowerCase()) return false;
+  
+  // If the logged in user is NOT part of the Firm, they don't get notifications from anyone
+  if (!isFirmMember(currentUser)) return false;
+  
+  // If the user who performed the action is NOT part of the Firm, the Firm doesn't get notified
+  if (!isFirmMember(user)) return false;
+
+  // Otherwise, a valid Firm action was taken by another Firm member!
+  try {
+    const audio = new Audio('/fahhhhh.mp3');
+    audio.play().catch(err => console.warn('Audio playback blocked by browser until user click:', err));
+  } catch (e) {
+    console.warn('Audio element not supported:', e);
+  }
+
+  // OS-level mobile pull-down notifications mapping safely outside the window!
+  if ('Notification' in window && Notification.permission === 'granted' && navigator.serviceWorker) {
+    navigator.serviceWorker.ready.then(registration => {
+      registration.showNotification(`Gamdom Alert`, {
+        body: `${user.toUpperCase()} ${action} inside ${module}`,
+        icon: '/logo_embedded.svg',
+        vibrate: [200, 100, 200]
+      });
+    }).catch(e => console.warn('Service worker notification failed:', e));
+  }
+
+  toast.info(`${user.toUpperCase()} ${action} inside ${module}!`, {
+    position: "top-right",
+    autoClose: 6000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    theme: "colored"
+  });
+
+  return true;
+};

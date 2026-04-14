@@ -1,41 +1,38 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  name: { 
-    type: String, 
+  username: {
+    type: String,
     required: true,
-    trim: true
-  },
-  username: { 
-    type: String, 
-    required: true, 
-    unique: true, 
-    index: true,
-    trim: true,
-    lowercase: true
+    unique: true
   },
   pin: {
     type: String,
     required: true
   },
-  failedPinAttempts: {
-    type: Number,
-    default: 0
-  },
-  lockUntil: {
+  createdAt: {
     type: Date,
-    default: null
-  },
-  role: { 
-    type: String, 
-    enum: ['owner', 'sub_manager', 'manager', 'worker'], 
-    default: 'worker',
-    index: true
-  },
-  contactNumber: {
-    type: String,
-    trim: true
+    default: Date.now
   }
-}, { timestamps: true });
+});
 
-export default mongoose.model('User', userSchema);
+// Hash PIN before saving
+userSchema.pre('save', async function(next) {
+  if (this.isModified('pin')) {
+    try {
+      const salt = await bcrypt.genSalt(10);
+      this.pin = await bcrypt.hash(this.pin, salt);
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
+
+// Method to compare PIN
+userSchema.methods.comparePIN = async function(enteredPIN) {
+  return await bcrypt.compare(enteredPIN, this.pin);
+};
+
+module.exports = mongoose.model('User', userSchema);

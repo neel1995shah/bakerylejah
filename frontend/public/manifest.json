@@ -1,0 +1,16 @@
+{
+  "short_name": "Gamdom",
+  "name": "Gamdom Finance App",
+  "icons": [
+    {
+      "src": "/logo_embedded.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#764ba2",
+  "background_color": "#ffffff"
+}

@@ -1,30 +1,63 @@
-import express from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { User } from '../models.js';
-
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 const router = express.Router();
 
+// Login endpoint
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const user = await User.findOne({ username });
-  if (user && bcrypt.compareSync(password, user.password)) {
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret');
-    res.json({ token, role: user.role });
-  } else {
-    res.status(401).json({ error: 'Invalid credentials' });
-  }
-});
-
-router.post('/register', async (req, res) => {
-  const { username, password, role } = req.body;
-  const hashedPassword = bcrypt.hashSync(password, 10);
   try {
-    const user = await User.create({ username, password: hashedPassword, role });
-    res.json({ success: true, user });
-  } catch (e) {
-    res.status(400).json({ error: 'User exists' });
+    const { username, pin } = req.body;
+
+    if (!username || !pin) {
+      return res.status(400).json({ message: 'Username and PIN required' });
+    }
+
+    // Find user
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // Compare PIN
+    const isMatch = await user.comparePIN(pin);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // Create JWT token
+    const token = jwt.sign({ userId: user._id, username: user.username }, process.env.JWT_SECRET, {
+      expiresIn: '24h'
+    });
+
+    res.json({ token, username: user.username });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-export default router;
+// Register endpoint (for initial setup)
+router.post('/register', async (req, res) => {
+  try {
+    const { username, pin } = req.body;
+
+    if (!username || !pin || pin.length !== 4) {
+      return res.status(400).json({ message: 'Username and 4-digit PIN required' });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+
+    // Create new user
+    const user = new User({ username, pin });
+    await user.save();
+
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+module.exports = router;
