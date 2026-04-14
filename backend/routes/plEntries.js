@@ -18,13 +18,20 @@ const buildScopeQuery = async (req, extraQuery = {}) => {
     };
   }
 
-  const firmUsers = await User.find({ username: { $regex: FIRM_USERNAME_REGEX } }).select('_id');
-  const firmUserIds = firmUsers.map((user) => user._id);
+  try {
+    const firmUsers = await User.find({ username: { $regex: FIRM_USERNAME_REGEX } }).select('_id');
+    const firmUserIds = firmUsers.map((user) => user._id);
 
-  return {
-    ...extraQuery,
-    userId: { $in: firmUserIds.length > 0 ? firmUserIds : [req.userId] }
-  };
+    return {
+      ...extraQuery,
+      userId: { $in: firmUserIds.length > 0 ? firmUserIds : [req.userId] }
+    };
+  } catch (err) {
+    return {
+      ...extraQuery,
+      userId: req.userId
+    };
+  }
 };
 
 const verifyToken = (req, res, next) => {

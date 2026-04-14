@@ -14,12 +14,16 @@ const Dashboard = ({ token, username }) => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [plResponse, ledgerResponse, accountsResponse] = await Promise.all([
+        const [plResult, ledgerResult, accountsResult] = await Promise.allSettled([
           apiClient.get('/api/pl-entries'),
           apiClient.get('/api/ledger-entries'),
           apiClient.get('/api/accounts')
         ]);
-        
+
+        const plResponse = plResult.status === 'fulfilled' ? plResult.value : { data: { entries: [], totals: {} } };
+        const ledgerResponse = ledgerResult.status === 'fulfilled' ? ledgerResult.value : { data: [] };
+        const accountsResponse = accountsResult.status === 'fulfilled' ? accountsResult.value : { data: [] };
+
         // Backend already applies scope rules; consume scoped data directly.
         const visiblePlEntries = plResponse.data.entries || [];
         const visibleLedgerEntries = ledgerResponse.data || [];
@@ -63,6 +67,14 @@ const Dashboard = ({ token, username }) => {
         active = scopedAccounts.filter((account) => Boolean(account.isActive)).length;
         inactive = total - active;
         setAccountStats({ total, active, inactive });
+
+        if (plResult.status === 'rejected' || ledgerResult.status === 'rejected' || accountsResult.status === 'rejected') {
+          console.error('Dashboard partial API failure:', {
+            pl: plResult.status === 'rejected' ? plResult.reason?.response?.data || plResult.reason?.message : null,
+            ledger: ledgerResult.status === 'rejected' ? ledgerResult.reason?.response?.data || ledgerResult.reason?.message : null,
+            accounts: accountsResult.status === 'rejected' ? accountsResult.reason?.response?.data || accountsResult.reason?.message : null
+          });
+        }
 
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
