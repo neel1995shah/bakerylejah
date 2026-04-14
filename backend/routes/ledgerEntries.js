@@ -1,8 +1,31 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const LedgerEntry = require('../models/LedgerEntry');
+const User = require('../models/User');
 
 const router = express.Router();
+const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
+const FIRM_USERNAME_REGEX = new RegExp(`^(${FIRM_NAMES.join('|')})$`, 'i');
+
+const normalizeName = (value) => (value || '').toLowerCase().trim();
+const isFirmMember = (username) => FIRM_NAMES.includes(normalizeName(username));
+
+const buildScopeQuery = async (req, extraQuery = {}) => {
+  if (!isFirmMember(req.username)) {
+    return {
+      ...extraQuery,
+      userId: req.userId
+    };
+  }
+
+  const firmUsers = await User.find({ username: { $regex: FIRM_USERNAME_REGEX } }).select('_id');
+  const firmUserIds = firmUsers.map((user) => user._id);
+
+  return {
+    ...extraQuery,
+    userId: { $in: firmUserIds.length > 0 ? firmUserIds : [req.userId] }
+  };
+};
 
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -31,8 +54,8 @@ const buildRunningEntries = (entries) => {
   });
 };
 
-const recalculateTotals = async (userId) => {
-  const entries = await LedgerEntry.find({ userId }).sort({ date: 1, createdAt: 1 });
+const recalculateTotals = async (scopeQuery) => {
+  const entries = await LedgerEntry.find(scopeQuery).sort({ date: 1, createdAt: 1 });
   let runningTotal = 0;
 
   for (const entry of entries) {
@@ -44,7 +67,8 @@ const recalculateTotals = async (userId) => {
 
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const entries = await LedgerEntry.find({ userId: req.userId }).sort({ date: 1, createdAt: 1 });
+    const scopeQuery = await buildScopeQuery(req);
+    const entries = await LedgerEntry.find(scopeQuery).sort({ date: 1, createdAt: 1 });
     const rows = buildRunningEntries(entries);
     res.json(rows.reverse());
   } catch (err) {
@@ -67,7 +91,8 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'in and out must be valid non-negative numbers' });
     }
 
-    const lastEntry = await LedgerEntry.findOne({ userId: req.userId }).sort({ date: -1, createdAt: -1 });
+    const scopeQuery = await buildScopeQuery(req);
+    const lastEntry = await LedgerEntry.findOne(scopeQuery).sort({ date: -1, createdAt: -1 });
     const previousTotal = lastEntry ? Number(lastEntry.total || 0) : 0;
     const total = previousTotal + safeIn - safeOut;
 
@@ -110,7 +135,8 @@ router.put('/:id', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'in and out must be valid non-negative numbers' });
     }
 
-    const existingEntry = await LedgerEntry.findOne({ _id: req.params.id, userId: req.userId });
+    const scopedEntryQuery = await buildScopeQuery(req, { _id: req.params.id });
+    const existingEntry = await LedgerEntry.findOne(scopedEntryQuery);
 
     if (!existingEntry) {
       return res.status(404).json({ message: 'Ledger entry not found' });
@@ -125,7 +151,7 @@ router.put('/:id', verifyToken, async (req, res) => {
     }
 
     const entry = await LedgerEntry.findOneAndUpdate(
-      { _id: req.params.id, userId: req.userId },
+      scopedEntryQuery,
       {
         date,
         name,
@@ -136,8 +162,9 @@ router.put('/:id', verifyToken, async (req, res) => {
       { new: true }
     );
 
-    await recalculateTotals(req.userId);
-    const refreshed = await LedgerEntry.findOne({ _id: req.params.id, userId: req.userId });
+    const scopeQuery = await buildScopeQuery(req);
+    await recalculateTotals(scopeQuery);
+    const refreshed = await LedgerEntry.findOne(scopedEntryQuery);
 
     req.app.get('io').emit('realtime-update', {
       action: 'updated an entry',
@@ -153,7 +180,8 @@ router.put('/:id', verifyToken, async (req, res) => {
 
 router.put('/:id/settle', verifyToken, async (req, res) => {
   try {
-    const entry = await LedgerEntry.findOne({ _id: req.params.id, userId: req.userId });
+    const scopedEntryQuery = await buildScopeQuery(req, { _id: req.params.id });
+    const entry = await LedgerEntry.findOne(scopedEntryQuery);
 
     if (!entry) {
       return res.status(404).json({ message: 'Ledger entry not found' });
@@ -176,6 +204,35 @@ router.put('/:id/settle', verifyToken, async (req, res) => {
     res.json(entry);
   } catch (err) {
     res.status(500).json({ message: 'Error settling ledger entry', error: err.message });
+  }
+});
+
+router.delete('/:id', verifyToken, async (req, res) => {
+  try {
+    const scopedEntryQuery = await buildScopeQuery(req, { _id: req.params.id });
+    const entry = await LedgerEntry.findOne(scopedEntryQuery);
+
+    if (!entry) {
+      return res.status(404).json({ message: 'Ledger entry not found' });
+    }
+
+    if (entry.settled) {
+      return res.status(400).json({ message: 'Settled entries cannot be deleted' });
+    }
+
+    await LedgerEntry.deleteOne({ _id: entry._id });
+    const scopeQuery = await buildScopeQuery(req);
+    await recalculateTotals(scopeQuery);
+
+    req.app.get('io').emit('realtime-update', {
+      action: 'deleted an entry',
+      user: req.username,
+      module: 'Ledger'
+    });
+
+    return res.json({ message: 'Ledger entry deleted successfully' });
+  } catch (err) {
+    return res.status(500).json({ message: 'Error deleting ledger entry', error: err.message });
   }
 });
 

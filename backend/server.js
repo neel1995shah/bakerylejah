@@ -54,6 +54,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/pl-entries', require('./routes/plEntries'));
 app.use('/api/ledger-entries', require('./routes/ledgerEntries'));
+app.use('/api/accounts', require('./routes/accounts'));
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

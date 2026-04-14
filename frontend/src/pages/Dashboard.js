@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../config/api';
-import { filterByScope, isFirmMember } from '../utils/auth';
+import { isFirmMember } from '../utils/auth';
 import { socket } from '../utils/socket';
 import '../styles/Dashboard.css';
 
@@ -9,35 +9,31 @@ const Dashboard = ({ token, username }) => {
   const [dashboardStats, setDashboardStats] = useState({ in: 0, out: 0, charges: 0, netProfit: 0, ledgerBalance: 0 });
   const [accountStats, setAccountStats] = useState({ total: 0, active: 0, inactive: 0 });
   const [nonSettledEntries, setNonSettledEntries] = useState([]);
+  const [nonSettledLedgerEntries, setNonSettledLedgerEntries] = useState([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [plResponse, ledgerResponse] = await Promise.all([
+        const [plResponse, ledgerResponse, accountsResponse] = await Promise.all([
           apiClient.get('/api/pl-entries'),
-          apiClient.get('/api/ledger-entries')
+          apiClient.get('/api/ledger-entries'),
+          apiClient.get('/api/accounts')
         ]);
         
-        const plEntries = plResponse.data.entries || [];
-        const ledgerEntries = ledgerResponse.data || [];
-
-        // Scope filter the entries down securely based on logged in username
-        const visiblePlEntries = filterByScope(plEntries, username, 'handler');
-        const visibleLedgerEntries = filterByScope(ledgerEntries, username, 'name');
+        // Backend already applies scope rules; consume scoped data directly.
+        const visiblePlEntries = plResponse.data.entries || [];
+        const visibleLedgerEntries = ledgerResponse.data || [];
+        const plTotals = plResponse.data.totals || {};
 
         const nonSettledVisiblePlEntries = visiblePlEntries.filter((entry) => !entry.settled);
-        const scopedStats = { in: 0, out: 0, charges: 0, netProfit: 0, ledgerBalance: 0 };
-
-        nonSettledVisiblePlEntries.forEach(entry => {
-          const inVal = Number(entry.in || 0);
-          const outVal = Number(entry.out || 0);
-          const chgVal = Number(entry.charges || 0);
-          
-          scopedStats.in += inVal;
-          scopedStats.out += outVal;
-          scopedStats.charges += chgVal;
-          scopedStats.netProfit += Number(entry.netProfit || (inVal - outVal - chgVal));
-        });
+        const nonSettledVisibleLedgerEntries = visibleLedgerEntries.filter((entry) => !entry.settled);
+        const scopedStats = {
+          in: Number(plTotals.totalIn ?? 0),
+          out: Number(plTotals.totalOut ?? 0),
+          charges: Number(plTotals.totalCharges ?? 0),
+          netProfit: Number(plTotals.totalNetProfit ?? 0),
+          ledgerBalance: 0
+        };
 
         visibleLedgerEntries.forEach(entry => {
           const inVal = Number(entry.in || 0);
@@ -52,24 +48,20 @@ const Dashboard = ({ token, username }) => {
             .sort((a, b) => new Date(b.date) - new Date(a.date))
             .slice(0, 50)
         );
+        setNonSettledLedgerEntries(
+          nonSettledVisibleLedgerEntries
+            .slice()
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 50)
+        );
 
-        // Fetch Accounts from Local Storage and explicitly scope them as well
-        const savedAccounts = localStorage.getItem('gamdom-accounts');
+        // Accounts are server-scoped; consume them directly.
+        const scopedAccounts = accountsResponse.data || [];
         let total = 0, active = 0, inactive = 0;
-        
-        if (savedAccounts) {
-          try {
-            const parsed = JSON.parse(savedAccounts);
-            if (Array.isArray(parsed)) {
-              const visibleAccounts = filterByScope(parsed, username, 'handler');
-              total = visibleAccounts.length;
-              active = visibleAccounts.filter(acc => acc.isActive).length;
-              inactive = total - active;
-            }
-          } catch (e) {
-            console.error('Error parsing accounts', e);
-          }
-        }
+
+        total = scopedAccounts.length;
+        active = scopedAccounts.filter((account) => Boolean(account.isActive)).length;
+        inactive = total - active;
         setAccountStats({ total, active, inactive });
 
       } catch (err) {
@@ -132,6 +124,40 @@ const Dashboard = ({ token, username }) => {
           <h3>Inactive Accounts</h3>
           <p className="amount">{accountStats.inactive}</p>
         </div>
+      </div>
+
+      <h2 style={{ marginTop: '2.5rem' }}>Non-Settled Ledger Entries</h2>
+      <div className="table-container">
+        <table className="ledger-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Name</th>
+              <th>In</th>
+              <th>Out</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {nonSettledLedgerEntries.length > 0 ? (
+              nonSettledLedgerEntries.map((entry) => (
+                <tr key={entry._id}>
+                  <td>{new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</td>
+                  <td>{entry.name}</td>
+                  <td>{Number(entry.in || 0).toFixed(2).replace(/\.00$/, '')}</td>
+                  <td>{Number(entry.out || 0).toFixed(2).replace(/\.00$/, '')}</td>
+                  <td className={Number(entry.total || 0) >= 0 ? 'income-text' : 'expense-text'}>
+                    {Number(entry.total || 0).toFixed(3).replace(/\.?0+$/, '')}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5" className="no-data">No non-settled Ledger entries.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       <h2 style={{ marginTop: '2.5rem' }}>Non-Settled P&L Entries</h2>

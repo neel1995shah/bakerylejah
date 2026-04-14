@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import apiClient from '../config/api';
-import { filterByScope } from '../utils/auth';
 import { socket } from '../utils/socket';
 import '../styles/Dashboard.css';
 
@@ -37,10 +36,9 @@ const Ledger = ({ token, username }) => {
   const activeAccounts = accounts.filter((acc) => acc.isActive);
   const handlerSuggestions = [...new Set(activeAccounts.map((acc) => acc.handler).filter(Boolean))];
 
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
     const response = await apiClient.get('/api/ledger-entries');
-    const allEntries = response.data || [];
-    const visibleEntries = filterByScope(allEntries, username, 'name');
+    const visibleEntries = response.data || [];
 
     let currentTotal = 0;
     const recalculatedEntries = visibleEntries
@@ -53,7 +51,7 @@ const Ledger = ({ token, username }) => {
       .reverse();
 
     setEntries(recalculatedEntries);
-  };
+  }, []);
 
   useEffect(() => {
     const fetchLedger = async () => {
@@ -72,7 +70,7 @@ const Ledger = ({ token, username }) => {
     return () => {
       socket.off('realtime-update', fetchEntries);
     };
-  }, [token, username]);
+  }, [token, fetchEntries]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
@@ -209,6 +207,23 @@ const Ledger = ({ token, username }) => {
     }
   };
 
+  const handleDelete = async (entryId) => {
+    setMessage('');
+
+    const shouldDelete = window.confirm('Delete this ledger entry? This action cannot be undone.');
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      await apiClient.delete(`/api/ledger-entries/${entryId}`);
+      await fetchEntries();
+      setMessage('Entry deleted successfully.');
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Failed to delete entry.');
+    }
+  };
+
   if (loading) return <div>Loading ledger...</div>;
 
   return (
@@ -308,6 +323,14 @@ const Ledger = ({ token, username }) => {
                       disabled={entry.settled}
                     >
                       Settle
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-btn"
+                      onClick={() => handleDelete(entry._id)}
+                      disabled={entry.settled}
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>

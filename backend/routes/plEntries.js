@@ -1,23 +1,29 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const PLEntry = require('../models/PLEntry');
+const User = require('../models/User');
 
 const router = express.Router();
-const FIRM_NAMES = ['krish', 'harsh', 'meet'];
+const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
+const FIRM_USERNAME_REGEX = new RegExp(`^(${FIRM_NAMES.join('|')})$`, 'i');
 
-const isFirmMember = (username) => FIRM_NAMES.includes((username || '').toLowerCase().trim());
+const normalizeName = (value) => (value || '').toLowerCase().trim();
+const isFirmMember = (username) => FIRM_NAMES.includes(normalizeName(username));
 
-const buildScopeQuery = (req, extraQuery = {}) => {
-  if (isFirmMember(req.username)) {
+const buildScopeQuery = async (req, extraQuery = {}) => {
+  if (!isFirmMember(req.username)) {
     return {
       ...extraQuery,
-      handler: { $in: FIRM_NAMES }
+      userId: req.userId
     };
   }
 
+  const firmUsers = await User.find({ username: { $regex: FIRM_USERNAME_REGEX } }).select('_id');
+  const firmUserIds = firmUsers.map((user) => user._id);
+
   return {
     ...extraQuery,
-    userId: req.userId
+    userId: { $in: firmUserIds.length > 0 ? firmUserIds : [req.userId] }
   };
 };
 
@@ -39,7 +45,8 @@ const verifyToken = (req, res, next) => {
 
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const entries = await PLEntry.find(buildScopeQuery(req)).sort({ date: -1, createdAt: -1 });
+    const scopeQuery = await buildScopeQuery(req);
+    const entries = await PLEntry.find(scopeQuery).sort({ date: -1, createdAt: -1 });
 
     const totals = entries.reduce(
       (acc, row) => {
@@ -119,7 +126,8 @@ router.put('/:id', verifyToken, async (req, res) => {
 
     const netProfit = safeOut - safeIn - safeCharges;
 
-    const existingEntry = await PLEntry.findOne(buildScopeQuery(req, { _id: req.params.id }));
+    const scopedEntryQuery = await buildScopeQuery(req, { _id: req.params.id });
+    const existingEntry = await PLEntry.findOne(scopedEntryQuery);
 
     if (!existingEntry) {
       return res.status(404).json({ message: 'P&L entry not found' });
@@ -130,7 +138,7 @@ router.put('/:id', verifyToken, async (req, res) => {
     }
 
     const entry = await PLEntry.findOneAndUpdate(
-      buildScopeQuery(req, { _id: req.params.id }),
+      scopedEntryQuery,
       {
         date,
         handler,
@@ -157,7 +165,8 @@ router.put('/:id', verifyToken, async (req, res) => {
 
 router.put('/:id/settle', verifyToken, async (req, res) => {
   try {
-    const entry = await PLEntry.findOne(buildScopeQuery(req, { _id: req.params.id }));
+    const scopedEntryQuery = await buildScopeQuery(req, { _id: req.params.id });
+    const entry = await PLEntry.findOne(scopedEntryQuery);
 
     if (!entry) {
       return res.status(404).json({ message: 'P&L entry not found' });
@@ -180,6 +189,33 @@ router.put('/:id/settle', verifyToken, async (req, res) => {
     return res.json(entry);
   } catch (err) {
     return res.status(500).json({ message: 'Error settling P&L entry', error: err.message });
+  }
+});
+
+router.delete('/:id', verifyToken, async (req, res) => {
+  try {
+    const scopedEntryQuery = await buildScopeQuery(req, { _id: req.params.id });
+    const entry = await PLEntry.findOne(scopedEntryQuery);
+
+    if (!entry) {
+      return res.status(404).json({ message: 'P&L entry not found' });
+    }
+
+    if (entry.settled) {
+      return res.status(400).json({ message: 'Settled entries cannot be deleted' });
+    }
+
+    await PLEntry.deleteOne({ _id: entry._id });
+
+    req.app.get('io').emit('realtime-update', {
+      action: 'deleted an entry',
+      user: req.username,
+      module: 'P&L'
+    });
+
+    return res.json({ message: 'P&L entry deleted successfully' });
+  } catch (err) {
+    return res.status(500).json({ message: 'Error deleting P&L entry', error: err.message });
   }
 });
 

@@ -1,62 +1,131 @@
-import React, { useEffect, useState } from 'react';
-import { filterByScope } from '../utils/auth';
+import React, { useCallback, useEffect, useState } from 'react';
+import apiClient from '../config/api';
+import { FIRM_NAMES, isFirmMember, normalizeUsername } from '../utils/auth';
+import { socket } from '../utils/socket';
 import '../styles/Dashboard.css';
 
-const STORAGE_KEY = 'gamdom-accounts';
 const PAGE_SIZE = 50;
+const LEGACY_STORAGE_KEY = 'gamdom-accounts';
+const MIGRATION_FLAG_KEY = 'gamdom-accounts-migrated-v1';
 
 const Accounts = ({ token, username }) => {
+  const normalizedUsername = normalizeUsername(username);
+  const userIsFirmMember = isFirmMember(username);
   const [formData, setFormData] = useState({
-    handler: '',
+    handler: userIsFirmMember ? '' : username || '',
     accountName: '',
     password: ''
   });
-  const [allAccounts, setAllAccounts] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAccountId, setEditingAccountId] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('handler-asc');
-  const [hasLoadedAccounts, setHasLoadedAccounts] = useState(false);
 
-  useEffect(() => {
-    const savedAccounts = localStorage.getItem(STORAGE_KEY);
-    if (!savedAccounts) {
-      setHasLoadedAccounts(true);
-      return;
+  const migrateLegacyAccountsToServer = useCallback(async () => {
+    if (localStorage.getItem(MIGRATION_FLAG_KEY) === 'true') {
+      return false;
     }
 
+    const rawLegacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!rawLegacy) {
+      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      return false;
+    }
+
+    let legacyAccounts = [];
     try {
-      const parsed = JSON.parse(savedAccounts);
+      const parsed = JSON.parse(rawLegacy);
       if (Array.isArray(parsed)) {
-        setAllAccounts(parsed);
+        legacyAccounts = parsed;
       }
     } catch (err) {
-      setMessage('Could not load saved accounts.');
-    } finally {
-      setHasLoadedAccounts(true);
+      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      return false;
     }
+
+    if (legacyAccounts.length === 0) {
+      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      return false;
+    }
+
+    const normalizeBoolean = (value) => {
+      if (typeof value === 'boolean') {
+        return value;
+      }
+      const normalized = String(value || '').toLowerCase().trim();
+      return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'active';
+    };
+
+    const payloads = legacyAccounts
+      .map((account) => ({
+        handler: String(account.handler || '').trim(),
+        accountName: String(account.accountName || account.accountId || '').trim(),
+        password: String(account.password || '').trim(),
+        isActive: normalizeBoolean(account.isActive)
+      }))
+      .filter((account) => account.handler && account.accountName && account.password);
+
+    if (payloads.length === 0) {
+      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      return false;
+    }
+
+    await Promise.allSettled(payloads.map((payload) => apiClient.post('/api/accounts', payload)));
+    localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+    return true;
+  }, []);
+
+  const fetchAccounts = useCallback(async () => {
+    const response = await apiClient.get('/api/accounts');
+    setAccounts(response.data || []);
   }, []);
 
   useEffect(() => {
-    if (!hasLoadedAccounts) {
-      return;
+    const loadAccounts = async () => {
+      try {
+        const response = await apiClient.get('/api/accounts');
+        const scopedAccounts = response.data || [];
+
+        if (scopedAccounts.length === 0) {
+          const migrated = await migrateLegacyAccountsToServer();
+          if (migrated) {
+            await fetchAccounts();
+          } else {
+            setAccounts(scopedAccounts);
+          }
+        } else {
+          setAccounts(scopedAccounts);
+          localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+        }
+      } catch (err) {
+        setMessage(err.response?.data?.message || 'Failed to load accounts.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      loadAccounts();
+      socket.on('realtime-update', fetchAccounts);
     }
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(allAccounts));
-    const visibleAccounts = filterByScope(allAccounts, username, 'handler');
-    // Fallback: show all saved rows if strict scope filtering produces an empty view.
-    setAccounts(visibleAccounts.length > 0 ? visibleAccounts : allAccounts);
-  }, [allAccounts, username, hasLoadedAccounts]);
+    return () => {
+      socket.off('realtime-update', fetchAccounts);
+    };
+  }, [token, fetchAccounts, migrateLegacyAccountsToServer]);
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(accounts.length / PAGE_SIZE));
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+    if (showCreateModal && !userIsFirmMember) {
+      setFormData((prev) => ({
+        ...prev,
+        handler: username || ''
+      }));
     }
-  }, [accounts.length, currentPage]);
+  }, [showCreateModal, userIsFirmMember, username]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -66,7 +135,7 @@ const Accounts = ({ token, username }) => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
 
@@ -74,55 +143,56 @@ const Accounts = ({ token, username }) => {
     const trimmedAccountName = formData.accountName.trim();
     const trimmedPassword = formData.password.trim();
 
-    if (!trimmedHandler || !trimmedAccountName || !trimmedPassword) {
+    let scopedHandler = trimmedHandler;
+    if (userIsFirmMember) {
+      const normalizedHandler = trimmedHandler.toLowerCase();
+      if (!FIRM_NAMES.includes(normalizedHandler)) {
+        setMessage('Group handler must be one of: krish, harsh, meet.');
+        return;
+      }
+      scopedHandler = normalizedHandler;
+    } else {
+      scopedHandler = username || '';
+    }
+
+    if (!scopedHandler || !trimmedAccountName || !trimmedPassword) {
       setMessage('Please fill all fields.');
       return;
     }
 
-    if (editingAccountId) {
-      setAllAccounts((prev) =>
-        prev.map((account) =>
-          account.id === editingAccountId
-            ? {
-                ...account,
-                handler: trimmedHandler,
-                accountName: trimmedAccountName,
-                password: trimmedPassword
-              }
-            : account
-        )
-      );
-      setMessage('Account updated successfully.');
-    } else {
-      const newAccount = {
-        id: Date.now(),
-        handler: trimmedHandler,
+    try {
+      const payload = {
+        handler: scopedHandler,
         accountName: trimmedAccountName,
-        password: trimmedPassword,
-        isActive: true,
-        createdAt: new Date().toISOString()
+        password: trimmedPassword
       };
 
-      setAllAccounts((prev) => [newAccount, ...prev]);
-      setMessage('Account added successfully.');
+      if (editingAccountId) {
+        await apiClient.put(`/api/accounts/${editingAccountId}`, payload);
+      } else {
+        await apiClient.post('/api/accounts', payload);
+      }
+
+      await fetchAccounts();
+      setFormData({
+        handler: userIsFirmMember ? '' : username || '',
+        accountName: '',
+        password: ''
+      });
+      setShowCreateModal(false);
+      setEditingAccountId(null);
+      setMessage(editingAccountId ? 'Account updated successfully.' : 'Account added successfully.');
+      setTimeout(() => setMessage(''), 2500);
+    } catch (err) {
+      setMessage(err.response?.data?.message || (editingAccountId ? 'Failed to update account.' : 'Failed to add account.'));
     }
-
-    setFormData({
-      handler: '',
-      accountName: '',
-      password: ''
-    });
-    setShowCreateModal(false);
-    setEditingAccountId(null);
-
-    setTimeout(() => setMessage(''), 2500);
   };
 
   const handleOpenCreate = () => {
     setMessage('');
     setEditingAccountId(null);
     setFormData({
-      handler: '',
+      handler: userIsFirmMember ? '' : username || '',
       accountName: '',
       password: ''
     });
@@ -131,7 +201,7 @@ const Accounts = ({ token, username }) => {
 
   const handleOpenEdit = (account) => {
     setMessage('');
-    setEditingAccountId(account.id);
+    setEditingAccountId(account._id);
     setFormData({
       handler: account.handler || '',
       accountName: account.accountName || account.accountId || '',
@@ -140,30 +210,38 @@ const Accounts = ({ token, username }) => {
     setShowCreateModal(true);
   };
 
-  const handleStatusToggle = (id) => {
-    setAllAccounts((prev) =>
-      prev.map((account) =>
-        account.id === id
-          ? {
-              ...account,
-              isActive: !account.isActive
-            }
-          : account
-      )
-    );
+  const handleStatusToggle = async (account) => {
+    setMessage('');
+
+    try {
+      await apiClient.put(`/api/accounts/${account._id}/status`, {
+        isActive: !Boolean(account.isActive)
+      });
+      await fetchAccounts();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Failed to update account status.');
+    }
   };
 
-  const handleDelete = (id) => {
-    setAllAccounts((prev) => prev.filter((account) => account.id !== id));
+  const handleDelete = async (accountId) => {
+    setMessage('');
+
+    try {
+      await apiClient.delete(`/api/accounts/${accountId}`);
+      await fetchAccounts();
+      setMessage('Account deleted successfully.');
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Failed to delete account.');
+    }
   };
 
-  const handlerSuggestions = Array.from(
-    new Set(allAccounts.map((account) => account.handler).filter(Boolean))
-  );
+  const handlerSuggestions = userIsFirmMember
+    ? FIRM_NAMES
+    : [normalizedUsername].filter(Boolean);
 
   const accountNameSuggestions = Array.from(
     new Set(
-      allAccounts
+      accounts
         .map((account) => account.accountName || account.accountId)
         .filter(Boolean)
     )
@@ -214,6 +292,12 @@ const Accounts = ({ token, username }) => {
   const paginatedAccounts = sortedAccounts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const startItem = sortedAccounts.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const endItem = Math.min(currentPage * PAGE_SIZE, sortedAccounts.length);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <div className="dashboard-container">
@@ -268,6 +352,8 @@ const Accounts = ({ token, username }) => {
         {message}
       </div>}
 
+      {loading && <div>Loading accounts...</div>}
+
       {showCreateModal && (
         <div className="pl-modal-overlay" role="dialog" aria-modal="true" aria-label="Create account">
           <div className="pl-modal">
@@ -281,8 +367,9 @@ const Accounts = ({ token, username }) => {
                   name="handler"
                   value={formData.handler}
                   onChange={handleChange}
-                  placeholder="Enter handler name"
+                  placeholder={userIsFirmMember ? 'Enter handler name (krish/harsh/meet)' : 'Your handler name'}
                   list="handler-suggestions"
+                  readOnly={!userIsFirmMember}
                   required
                 />
               </div>
@@ -358,12 +445,12 @@ const Accounts = ({ token, username }) => {
             {sortedAccounts.length === 0 ? (
               <tr>
                 <td colSpan="5" className="no-data">
-                  {allAccounts.length === 0 ? 'No account fields added yet.' : 'No account fields match the current search.'}
+                  {accounts.length === 0 ? 'No account fields added yet.' : 'No account fields match the current search.'}
                 </td>
               </tr>
             ) : (
               paginatedAccounts.map((account) => (
-                <tr key={account.id} className={!account.isActive ? 'account-row-inactive' : ''}>
+                <tr key={account._id} className={!account.isActive ? 'account-row-inactive' : ''}>
                   <td>{account.handler}</td>
                   <td>{account.accountName || account.accountId}</td>
                   <td>{account.password}</td>
@@ -371,7 +458,7 @@ const Accounts = ({ token, username }) => {
                     <button
                       type="button"
                       className={`status-chip ${account.isActive ? 'active' : 'inactive'}`}
-                      onClick={() => handleStatusToggle(account.id)}
+                      onClick={() => handleStatusToggle(account)}
                     >
                       {account.isActive ? 'Active' : 'Inactive'}
                     </button>
@@ -387,7 +474,7 @@ const Accounts = ({ token, username }) => {
                     <button
                       type="button"
                       className="danger-btn"
-                      onClick={() => handleDelete(account.id)}
+                      onClick={() => handleDelete(account._id)}
                     >
                       Delete
                     </button>

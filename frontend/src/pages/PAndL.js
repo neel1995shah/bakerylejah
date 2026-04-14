@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import apiClient from '../config/api';
-import { filterByScope } from '../utils/auth';
 import { socket } from '../utils/socket';
 import '../styles/Dashboard.css';
 
 const PAndL = ({ token, username }) => {
   const PAGE_SIZE = 50;
   const [entries, setEntries] = useState([]);
-  const [totals, setTotals] = useState({ totalIn: 0, totalOut: 0, totalCharges: 0, totalNetProfit: 0 });
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState(null);
@@ -45,26 +43,12 @@ const PAndL = ({ token, username }) => {
       .filter(Boolean)
   )];
 
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
     const response = await apiClient.get('/api/pl-entries');
-    const allEntries = response.data.entries || [];
-    const visibleEntries = filterByScope(allEntries, username, 'handler');
-    
+    const visibleEntries = response.data.entries || [];
+
     setEntries(visibleEntries);
-    
-    const recalculatedTotals = visibleEntries.reduce((acc, row) => {
-      const inVal = Number(row.in || 0);
-      const outVal = Number(row.out || 0);
-      const chgVal = Number(row.charges || 0);
-      acc.totalIn += inVal;
-      acc.totalOut += outVal;
-      acc.totalCharges += chgVal;
-      acc.totalNetProfit += Number(row.netProfit || (inVal - outVal - chgVal));
-      return acc;
-    }, { totalIn: 0, totalOut: 0, totalCharges: 0, totalNetProfit: 0 });
-    
-    setTotals(recalculatedTotals);
-  };
+  }, []);
 
   useEffect(() => {
     const fetchPLData = async () => {
@@ -83,7 +67,7 @@ const PAndL = ({ token, username }) => {
     return () => {
       socket.off('realtime-update', fetchEntries);
     };
-  }, [token, username]);
+  }, [token, fetchEntries]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
@@ -204,6 +188,23 @@ const PAndL = ({ token, username }) => {
       setMessage('P&L entry settled successfully.');
     } catch (err) {
       setMessage(err.response?.data?.message || 'Failed to settle P&L entry.');
+    }
+  };
+
+  const handleDelete = async (entryId) => {
+    setMessage('');
+
+    const shouldDelete = window.confirm('Delete this P&L entry? This action cannot be undone.');
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      await apiClient.delete(`/api/pl-entries/${entryId}`);
+      await fetchEntries();
+      setMessage('P&L entry deleted successfully.');
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Failed to delete P&L entry.');
     }
   };
 
@@ -357,6 +358,14 @@ const PAndL = ({ token, username }) => {
                       disabled={row.settled}
                     >
                       Settle
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-btn"
+                      onClick={() => handleDelete(row._id)}
+                      disabled={row.settled}
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>
