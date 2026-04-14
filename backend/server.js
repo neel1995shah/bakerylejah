@@ -38,7 +38,7 @@ app.set('io', io);
 
 // Middleware
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(express.json());
 
 // MongoDB Connection
