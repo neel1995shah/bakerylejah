@@ -51,7 +51,7 @@ const Login = ({ onLogin }) => {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1>Gamdom Financial Management</h1>
+        <h1>Financial Management System</h1>
         <h2>Login</h2>
         
         <form onSubmit={handleLogin}>

@@ -4,6 +4,7 @@
   "description": "Root management for Lejaah project",
   "scripts": {
     "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "postinstall": "npm install --prefix backend",
     "build": "npm install --prefix backend",
     "start": "npm run start --prefix backend",
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm run start --prefix frontend\"",

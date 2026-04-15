@@ -2,14 +2,26 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../config/api';
 import { isFirmMember } from '../utils/auth';
 import { socket } from '../utils/socket';
+import { formatNumber, isObscuredModeEnabled } from '../utils/numberObfuscator';
 import '../styles/Dashboard.css';
 
 const Dashboard = ({ token, username }) => {
   const [loading, setLoading] = useState(true);
+  const [obscuredMode, setObscuredMode] = useState(isObscuredModeEnabled());
   const [dashboardStats, setDashboardStats] = useState({ in: 0, out: 0, charges: 0, netProfit: 0, ledgerBalance: 0 });
   const [accountStats, setAccountStats] = useState({ total: 0, active: 0, inactive: 0 });
   const [nonSettledEntries, setNonSettledEntries] = useState([]);
   const [nonSettledLedgerEntries, setNonSettledLedgerEntries] = useState([]);
+
+  // Listen for storage changes to update obscured mode
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setObscuredMode(isObscuredModeEnabled());
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -104,20 +116,20 @@ const Dashboard = ({ token, username }) => {
       <div className="pl-cards">
         <div className="card income">
           <h3>Total Revenue (In)</h3>
-          <p className="amount">{(dashboardStats.in || 0).toFixed(2).replace(/\.00$/, '')}</p>
+          <p className="amount">{formatNumber((dashboardStats.in || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</p>
         </div>
         <div className={`card profit ${(dashboardStats.netProfit || 0) >= 0 ? 'positive' : 'negative'}`}>
           <h3>Net Profit</h3>
-          <p className="amount">{(dashboardStats.netProfit || 0).toFixed(2).replace(/\.00$/, '')}</p>
+          <p className="amount">{formatNumber((dashboardStats.netProfit || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</p>
         </div>
         <div className={`card ${(dashboardStats.ledgerBalance || 0) >= 0 ? 'income' : 'expense'}`}>
           <h3>Ledger Balance</h3>
-          <p className="amount">{(dashboardStats.ledgerBalance || 0).toFixed(3).replace(/\.?0+$/, '')}</p>
+          <p className="amount">{formatNumber((dashboardStats.ledgerBalance || 0).toFixed(3).replace(/\.?0+$/, ''), obscuredMode)}</p>
         </div>
         <div className="card">
           <h3>Total Expenses</h3>
           <p className="amount" style={{color: '#c53030'}}>
-            {((dashboardStats.out || 0) + (dashboardStats.charges || 0)).toFixed(2).replace(/\.00$/, '')}
+            {formatNumber(((dashboardStats.out || 0) + (dashboardStats.charges || 0)).toFixed(2).replace(/\.00$/, ''), obscuredMode)}
           </p>
         </div>
       </div>
@@ -126,15 +138,15 @@ const Dashboard = ({ token, username }) => {
       <div className="pl-cards">
         <div className="card">
           <h3>Total Accounts</h3>
-          <p className="amount" style={{color: '#2d3748'}}>{accountStats.total}</p>
+          <p className="amount" style={{color: '#2d3748'}}>{formatNumber(accountStats.total, obscuredMode)}</p>
         </div>
         <div className="card income">
           <h3>Active Accounts</h3>
-          <p className="amount">{accountStats.active}</p>
+          <p className="amount">{formatNumber(accountStats.active, obscuredMode)}</p>
         </div>
         <div className="card expense">
           <h3>Inactive Accounts</h3>
-          <p className="amount">{accountStats.inactive}</p>
+          <p className="amount">{formatNumber(accountStats.inactive, obscuredMode)}</p>
         </div>
       </div>
 
@@ -158,10 +170,10 @@ const Dashboard = ({ token, username }) => {
                   <td>{new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</td>
                   <td>{entry.entryCode || '-'}</td>
                   <td>{entry.name}</td>
-                  <td>{Number(entry.in || 0).toFixed(2).replace(/\.00$/, '')}</td>
-                  <td>{Number(entry.out || 0).toFixed(2).replace(/\.00$/, '')}</td>
+                  <td>{formatNumber(Number(entry.in || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
+                  <td>{formatNumber(Number(entry.out || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
                   <td className={Number(entry.total || 0) >= 0 ? 'income-text' : 'expense-text'}>
-                    {Number(entry.total || 0).toFixed(3).replace(/\.?0+$/, '')}
+                    {formatNumber(Number(entry.total || 0).toFixed(3).replace(/\.?0+$/, ''), obscuredMode)}
                   </td>
                 </tr>
               ))
@@ -197,11 +209,11 @@ const Dashboard = ({ token, username }) => {
                   <td>{entry.entryCode || '-'}</td>
                   <td>{entry.handler}</td>
                   <td>{entry.acc}</td>
-                  <td>{Number(entry.in || 0).toFixed(2).replace(/\.00$/, '')}</td>
-                  <td>{Number(entry.out || 0).toFixed(2).replace(/\.00$/, '')}</td>
-                  <td>{Number(entry.charges || 0).toFixed(2).replace(/\.00$/, '')}</td>
+                  <td>{formatNumber(Number(entry.in || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
+                  <td>{formatNumber(Number(entry.out || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
+                  <td>{formatNumber(Number(entry.charges || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
                   <td className={Number(entry.netProfit || 0) >= 0 ? 'income-text' : 'expense-text'}>
-                    {Number(entry.netProfit || 0).toFixed(2).replace(/\.00$/, '')}
+                    {formatNumber(Number(entry.netProfit || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}
                   </td>
                 </tr>
               ))

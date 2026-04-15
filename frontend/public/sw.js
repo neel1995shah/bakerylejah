@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gamdom-cache-v1';
+const CACHE_NAME = 'finance-cache-v1';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -18,7 +18,7 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('push', event => {
   const payload = event.data ? event.data.json() : {};
-  const title = payload.title || 'Gamdom Alert';
+  const title = payload.title || 'Finance Alert';
   const options = {
     body: payload.body || 'You have a new update',
     icon: payload.icon || '/logo_embedded.svg',

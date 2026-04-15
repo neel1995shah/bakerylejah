@@ -1,5 +1,12 @@
-const webpush = require('web-push');
+let webpush = null;
+try {
+  webpush = require('web-push');
+} catch (error) {
+  // Keep the API running even if push dependency is missing in a deployment.
+  console.warn('web-push module is not installed. Push notifications are disabled.');
+}
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
 const FIRM_USERNAME_REGEX = new RegExp(`^(${FIRM_NAMES.join('|')})$`, 'i');
@@ -49,6 +56,7 @@ const buildNotificationBody = (payload) => {
       .filter(Boolean)
       .join(', ');
     
+        const Notification = require('../models/Notification');
     if (!changeDetails) {
       return `${actor} ${actionCode} ${typeCode}`.trim();
     }
@@ -74,6 +82,10 @@ const configureWebPush = () => {
     return;
   }
 
+  if (!webpush) {
+    return;
+  }
+
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT || 'mailto:admin@example.com';
@@ -86,11 +98,42 @@ const configureWebPush = () => {
 
 const cleanPayload = (payload = {}) => ({
   action: payload.action || '',
+  actionType: payload.actionType || '',
+  entryType: payload.entryType || '',
+  entryCode: payload.entryCode || '',
   user: payload.user || '',
   module: payload.module || '',
   changes: Array.isArray(payload.changes) ? payload.changes : [],
+  detailedChanges: Array.isArray(payload.detailedChanges) ? payload.detailedChanges : [],
   body: payload.body || ''
 });
+
+const createNotificationRecord = async (recipientId, payload) => {
+  const body = payload.body || buildNotificationBody(payload);
+  const changes = (payload.detailedChanges || payload.changes || [])
+    .map((change) => {
+      if (typeof change === 'string') {
+        return change;
+      }
+
+      if (change && typeof change === 'object' && change.field) {
+        return `${change.field}: ${change.oldValue}→${change.newValue}`;
+      }
+
+      return '';
+    })
+    .filter(Boolean);
+
+  return Notification.create({
+    userId: recipientId,
+    actorUsername: payload.user,
+    action: payload.action || payload.actionType || '',
+    module: payload.module || payload.entryType || '',
+    body,
+    changes,
+    read: false
+  });
+};
 
 const saveSubscription = async (userId, subscription, userAgent = '') => {
   const user = await User.findById(userId);
@@ -133,17 +176,21 @@ const saveSubscription = async (userId, subscription, userAgent = '') => {
 };
 
 const sendPushToUser = async (user, payload) => {
+  if (!webpush) {
+    return;
+  }
+
   if (!user?.pushSubscriptions?.length) {
     return;
   }
 
   const notification = {
-    title: 'Gamdom Alert',
+    title: 'Finance Alert',
     body: payload.body || buildNotificationBody(payload),
     icon: '/logo_embedded.svg',
     badge: '/logo_embedded.svg',
     url: '/',
-    tag: `gamdom-${payload.module}-${payload.action}`
+    tag: `finance-${payload.module}-${payload.action}`
   };
 
   const subscriptions = [...user.pushSubscriptions];
@@ -176,27 +223,34 @@ const broadcastRealtimeNotification = async (io, payload) => {
     return;
   }
 
-  io.emit('realtime-update', clean);
-
   if (!isFirmMember(clean.user)) {
     return;
   }
 
   configureWebPush();
 
-  if (!webPushConfigured) {
-    return;
-  }
-
   const firmUsers = await User.find({ username: { $regex: FIRM_USERNAME_REGEX } });
   const recipients = firmUsers.filter((user) => normalizeName(user.username) !== normalizeName(clean.user));
 
   for (const recipient of recipients) {
-    if (io.activeUsers?.has(normalizeName(recipient.username))) {
-      continue;
-    }
+    const savedNotification = await createNotificationRecord(recipient._id, clean);
+    const room = normalizeName(recipient.username);
 
-    await sendPushToUser(recipient, clean);
+    if (io.activeUsers?.has(room)) {
+      io.to(room).emit('realtime-update', {
+        _id: savedNotification._id,
+        user: clean.user,
+        action: clean.action,
+        module: clean.module,
+        body: savedNotification.body,
+        changes: savedNotification.changes,
+        read: savedNotification.read,
+        date: savedNotification.createdAt,
+        actorInitial: formatActorInitial(clean.user)
+      });
+    } else if (webPushConfigured) {
+      await sendPushToUser(recipient, clean);
+    }
   }
 };
 

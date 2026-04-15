@@ -48,6 +48,7 @@ io.on('connection', (socket) => {
     const currentCount = activeUsers.get(key) || 0;
     activeUsers.set(key, currentCount + 1);
     socket.data.username = key;
+    socket.join(key);
   });
 
   socket.on('unregister-user', (username) => {
@@ -62,6 +63,8 @@ io.on('connection', (socket) => {
     } else {
       activeUsers.delete(key);
     }
+
+    socket.leave(key);
   });
 
   socket.on('disconnect', () => {
@@ -76,6 +79,8 @@ io.on('connection', (socket) => {
     } else {
       activeUsers.delete(key);
     }
+
+    socket.leave(key);
   });
 });
 
@@ -101,6 +106,8 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/pl-entries', require('./routes/plEntries'));
 app.use('/api/ledger-entries', require('./routes/ledgerEntries'));
 app.use('/api/accounts', require('./routes/accounts'));
+app.use('/api/crypto', require('./routes/crypto'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/push', require('./routes/push'));
 
 const PORT = process.env.PORT || 5000;

@@ -1,16 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import apiClient from '../config/api';
 import { FIRM_NAMES, isFirmMember, normalizeUsername } from '../utils/auth';
 import { socket } from '../utils/socket';
+import { formatNumber, toggleObscuredMode, isObscuredModeEnabled } from '../utils/numberObfuscator';
 import '../styles/Dashboard.css';
 
 const PAGE_SIZE = 50;
-const LEGACY_STORAGE_KEY = 'gamdom-accounts';
-const MIGRATION_FLAG_KEY = 'gamdom-accounts-migrated-v1';
+const LEGACY_STORAGE_KEY = 'finance-accounts';
+const MIGRATION_FLAG_KEY = 'finance-accounts-migrated-v1';
 
 const Accounts = ({ token, username }) => {
   const normalizedUsername = normalizeUsername(username);
   const userIsFirmMember = isFirmMember(username);
+  const titleRef = useRef(null);
+  const clickCountRef = useRef(0);
+  const clickTimeoutRef = useRef(null);
+  const [obscuredMode, setObscuredMode] = useState(isObscuredModeEnabled());
   const [formData, setFormData] = useState({
     handler: userIsFirmMember ? '' : username || '',
     accountName: '',
@@ -24,6 +29,42 @@ const Accounts = ({ token, username }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('handler-asc');
+
+  // Handle triple-click on Accounts heading to toggle obscured mode
+  useEffect(() => {
+    const handleTitleClick = () => {
+      clickCountRef.current += 1;
+
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+
+      if (clickCountRef.current === 3) {
+        const newMode = toggleObscuredMode();
+        setObscuredMode(newMode);
+        clickCountRef.current = 0;
+      } else {
+        clickTimeoutRef.current = setTimeout(() => {
+          clickCountRef.current = 0;
+        }, 500); // Reset count after 500ms
+      }
+    };
+
+    const titleElement = titleRef.current;
+    if (titleElement) {
+      titleElement.addEventListener('click', handleTitleClick);
+      titleElement.style.cursor = 'pointer';
+    }
+
+    return () => {
+      if (titleElement) {
+        titleElement.removeEventListener('click', handleTitleClick);
+      }
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const migrateLegacyAccountsToServer = useCallback(async () => {
     if (localStorage.getItem(MIGRATION_FLAG_KEY) === 'true') {
@@ -301,7 +342,7 @@ const Accounts = ({ token, username }) => {
 
   return (
     <div className="dashboard-container">
-      <h1>Accounts</h1>
+      <h1 ref={titleRef}>Accounts</h1>
 
       <div className="pl-toolbar">
         <button
@@ -453,7 +494,7 @@ const Accounts = ({ token, username }) => {
                 <tr key={account._id} className={!account.isActive ? 'account-row-inactive' : ''}>
                   <td>{account.handler}</td>
                   <td>{account.accountName || account.accountId}</td>
-                  <td>{account.password}</td>
+                  <td>{formatNumber(account.password, obscuredMode)}</td>
                   <td>
                     <button
                       type="button"

@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import apiClient from '../config/api';
 import { socket } from '../utils/socket';
+import { formatNumber, isObscuredModeEnabled } from '../utils/numberObfuscator';
 import '../styles/Dashboard.css';
 
 const Ledger = ({ token, username }) => {
   const PAGE_SIZE = 50;
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [obscuredMode, setObscuredMode] = useState(isObscuredModeEnabled());
   const [showForm, setShowForm] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [message, setMessage] = useState('');
@@ -22,7 +24,7 @@ const Ledger = ({ token, username }) => {
   const [accounts, setAccounts] = useState([]);
 
   useEffect(() => {
-    const savedAccounts = localStorage.getItem('gamdom-accounts');
+    const savedAccounts = localStorage.getItem('finance-accounts');
     if (savedAccounts) {
       try {
         const parsed = JSON.parse(savedAccounts);
@@ -31,6 +33,16 @@ const Ledger = ({ token, username }) => {
         }
       } catch (e) {}
     }
+  }, []);
+
+  // Listen for storage changes to update obscured mode
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setObscuredMode(isObscuredModeEnabled());
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const activeAccounts = accounts.filter((acc) => acc.isActive);
@@ -288,7 +300,7 @@ const Ledger = ({ token, username }) => {
             <tr className="pl-total-row">
               <td colSpan="5"><strong>Current Total</strong></td>
               <td className={filteredTotalBalance >= 0 ? 'income-text' : 'expense-text'}>
-                <strong>{Number(filteredTotalBalance || 0).toFixed(3).replace(/\.?0+$/, '')}</strong>
+                <strong>{formatNumber(Number(filteredTotalBalance || 0).toFixed(3).replace(/\.?0+$/, ''), obscuredMode)}</strong>
               </td>
               <td />
               <td />
@@ -299,10 +311,10 @@ const Ledger = ({ token, username }) => {
                   <td>{new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</td>
                   <td>{entry.entryCode || '-'}</td>
                   <td>{entry.name}</td>
-                  <td>{Number(entry.in || 0).toFixed(2).replace(/\.00$/, '')}</td>
-                  <td>{Number(entry.out || 0).toFixed(2).replace(/\.00$/, '')}</td>
+                  <td>{formatNumber(Number(entry.in || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
+                  <td>{formatNumber(Number(entry.out || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
                   <td className={entry.total >= 0 ? 'income-text' : 'expense-text'}>
-                    {Number(entry.total || 0).toFixed(3).replace(/\.?0+$/, '')}
+                    {formatNumber(Number(entry.total || 0).toFixed(3).replace(/\.?0+$/, ''), obscuredMode)}
                   </td>
                   <td>
                     <span className={`status-chip ${entry.settled ? 'inactive' : 'active'}`}>

@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import PAndL from './pages/PAndL';
 import Ledger from './pages/Ledger';
 import Accounts from './pages/Accounts';
+import Crypto from './pages/Crypto';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import apiClient from './config/api';
 import { socket } from './utils/socket';
 import { handleNotificationPulse, requestNativePermissions } from './utils/notifications';
 import { registerPushSubscription } from './utils/push';
@@ -20,6 +22,23 @@ function App() {
   const [showBell, setShowBell] = useState(false);
   const pushSetupRef = useRef(false);
 
+  const normalizeNotification = (notification) => ({
+    id: notification._id || notification.id,
+    user: notification.user || notification.actorUsername || '',
+    action: notification.action || '',
+    module: notification.module || '',
+    body: notification.body || '',
+    actorInitial: notification.actorInitial || (notification.actorUsername ? notification.actorUsername.trim().charAt(0).toUpperCase() : ''),
+    changes: notification.changes || [],
+    date: notification.date || notification.createdAt || new Date().toISOString(),
+    read: Boolean(notification.read)
+  });
+
+  const fetchNotifications = useCallback(async () => {
+    const response = await apiClient.get('/api/notifications');
+    setNotifications((response.data || []).map(normalizeNotification));
+  }, []);
+
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     const savedUsername = localStorage.getItem('username');
@@ -28,14 +47,25 @@ function App() {
       setUsername(savedUsername);
       setIsLoggedIn(true);
 
-      const savedNotifs = localStorage.getItem(`gamdom-notifications-${savedUsername}`);
-      if (savedNotifs) {
-        try {
-          setNotifications(JSON.parse(savedNotifs));
-        } catch(e) {}
-      }
+      apiClient.get('/api/notifications')
+        .then((response) => {
+          setNotifications((response.data || []).map(normalizeNotification));
+        })
+        .catch((error) => {
+          console.warn('Failed to load notifications:', error?.response?.data || error.message);
+        });
     }
   }, []);
+
+  useEffect(() => {
+    if (!token || !username) {
+      return;
+    }
+
+    fetchNotifications().catch((error) => {
+      console.warn('Failed to load notifications:', error?.response?.data || error.message);
+    });
+  }, [token, username, fetchNotifications]);
 
   useEffect(() => {
     if (token) {
@@ -49,7 +79,7 @@ function App() {
       localStorage.removeItem('token');
       localStorage.removeItem('username');
     }
-  }, [token, username]);
+  }, [token, username, fetchNotifications]);
 
   useEffect(() => {
     if (!token || !username) {
@@ -83,22 +113,16 @@ function App() {
       if (payload && payload.action) {
         const qualifyForHistory = handleNotificationPulse(payload, username);
         if (qualifyForHistory) {
-          const actorInitial = payload.actorInitial || (payload.user ? payload.user.trim().charAt(0).toUpperCase() : '');
-          const newNotif = {
-            id: Date.now(),
-            action: payload.action,
-            user: payload.user,
-            module: payload.module,
-            body: payload.body,
-            actorInitial,
-            changes: payload.changes || [],
-            date: new Date().toISOString(),
+          const newNotif = normalizeNotification({
+            ...payload,
+            id: payload._id || Date.now(),
             read: false
-          };
+          });
           setNotifications(prev => {
-            const updated = [newNotif, ...prev];
-            localStorage.setItem(`gamdom-notifications-${username}`, JSON.stringify(updated));
-            return updated;
+            if (newNotif.id && prev.some((item) => item.id === newNotif.id)) {
+              return prev;
+            }
+            return [newNotif, ...prev];
           });
         }
       }
@@ -119,6 +143,9 @@ function App() {
     registerPushSubscription(token).catch(err => {
       console.warn('Push registration failed:', err);
     });
+    fetchNotifications().catch(err => {
+      console.warn('Failed to load notifications:', err?.response?.data || err.message);
+    });
   };
 
   const handleLogout = () => {
@@ -130,17 +157,19 @@ function App() {
   };
 
   const clearNotifications = () => {
+    apiClient.delete('/api/notifications').catch((error) => {
+      console.warn('Failed to clear notifications:', error?.response?.data || error.message);
+    });
     setNotifications([]);
-    localStorage.removeItem(`gamdom-notifications-${username}`);
   };
 
   const handleOpenPanel = () => {
     setShowBell(!showBell);
-    // optionally mark read
     if (!showBell && notifications.some(n => !n.read)) {
-       const readAll = notifications.map(n => ({...n, read: true}));
-       setNotifications(readAll);
-       localStorage.setItem(`gamdom-notifications-${username}`, JSON.stringify(readAll));
+       apiClient.put('/api/notifications/read-all').catch((error) => {
+         console.warn('Failed to mark notifications as read:', error?.response?.data || error.message);
+       });
+       setNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })));
     }
   };
 
@@ -155,7 +184,7 @@ function App() {
         <nav className="navbar">
           <div className="nav-container">
             <Link to="/" className="nav-logo">
-              🏪 Gamdom Finance
+              🏪 Finance Management
             </Link>
             <ul className="nav-menu">
               <li className="nav-item">
@@ -171,7 +200,7 @@ function App() {
                 <Link to="/accounts" className="nav-link">Accounts</Link>
               </li>
               <li className="nav-item">
-                <span className="username">Welcome, {username}</span>
+                <Link to="/crypto" className="nav-link">Crypto</Link>
               </li>
               <li className="nav-item">
                 <button className="nav-bell" onClick={handleOpenPanel}>
@@ -215,6 +244,7 @@ function App() {
           <Route path="/pl" element={<PAndL token={token} username={username} />} />
           <Route path="/ledger" element={<Ledger token={token} username={username} />} />
           <Route path="/accounts" element={<Accounts token={token} username={username} />} />
+          <Route path="/crypto" element={<Crypto token={token} username={username} />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>

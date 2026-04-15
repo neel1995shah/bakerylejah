@@ -24,7 +24,7 @@ export const requestNativePermissions = () => {
 };
 
 export const handleNotificationPulse = (payload, currentUser) => {
-  const { action, user, module } = payload;
+  const { user } = payload;
   
   if (!user || !currentUser) return false;
   
@@ -48,7 +48,7 @@ export const handleNotificationPulse = (payload, currentUser) => {
   // OS-level mobile pull-down notifications mapping safely outside the window!
   if ('Notification' in window && Notification.permission === 'granted' && navigator.serviceWorker) {
     navigator.serviceWorker.ready.then(registration => {
-      registration.showNotification(`Gamdom Alert`, {
+      registration.showNotification(`Finance Alert`, {
         body: buildNotificationText(payload),
         icon: '/logo_embedded.svg',
         vibrate: [200, 100, 200]

@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import apiClient from '../config/api';
 import { socket } from '../utils/socket';
+import { formatNumber, isObscuredModeEnabled } from '../utils/numberObfuscator';
 import '../styles/Dashboard.css';
 
 const PAndL = ({ token, username }) => {
   const PAGE_SIZE = 50;
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [obscuredMode, setObscuredMode] = useState(isObscuredModeEnabled());
   const [showForm, setShowForm] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [message, setMessage] = useState('');
@@ -24,7 +26,7 @@ const PAndL = ({ token, username }) => {
   const [accounts, setAccounts] = useState([]);
 
   useEffect(() => {
-    const savedAccounts = localStorage.getItem('gamdom-accounts');
+    const savedAccounts = localStorage.getItem('finance-accounts');
     if (savedAccounts) {
       try {
         const parsed = JSON.parse(savedAccounts);
@@ -33,6 +35,16 @@ const PAndL = ({ token, username }) => {
         }
       } catch (e) {}
     }
+  }, []);
+
+  // Listen for storage changes to update obscured mode
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setObscuredMode(isObscuredModeEnabled());
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const activeAccounts = accounts.filter(acc => acc.isActive);
@@ -319,11 +331,11 @@ const PAndL = ({ token, username }) => {
           <tbody>
             <tr className="pl-total-row">
               <td colSpan="4"><strong>Total</strong></td>
-              <td><strong>{filteredTotals.totalIn.toFixed(2)}</strong></td>
-              <td><strong>{filteredTotals.totalOut.toFixed(2)}</strong></td>
-              <td><strong>{filteredTotals.totalCharges.toFixed(2)}</strong></td>
+              <td><strong>{formatNumber(filteredTotals.totalIn.toFixed(2), obscuredMode)}</strong></td>
+              <td><strong>{formatNumber(filteredTotals.totalOut.toFixed(2), obscuredMode)}</strong></td>
+              <td><strong>{formatNumber(filteredTotals.totalCharges.toFixed(2), obscuredMode)}</strong></td>
               <td className={filteredTotals.totalNetProfit >= 0 ? 'income-text' : 'expense-text'}>
-                <strong>{filteredTotals.totalNetProfit.toFixed(2)}</strong>
+                <strong>{formatNumber(filteredTotals.totalNetProfit.toFixed(2), obscuredMode)}</strong>
               </td>
               <td />
               <td />
@@ -335,10 +347,10 @@ const PAndL = ({ token, username }) => {
                   <td>{row.entryCode || '-'}</td>
                   <td>{row.handler}</td>
                   <td>{row.acc}</td>
-                  <td>{row.in || 0}</td>
-                  <td>{row.out || 0}</td>
-                  <td>{row.charges || 0}</td>
-                  <td className={row.netProfit >= 0 ? 'income-text' : 'expense-text'}>{row.netProfit || 0}</td>
+                  <td>{formatNumber(row.in || 0, obscuredMode)}</td>
+                  <td>{formatNumber(row.out || 0, obscuredMode)}</td>
+                  <td>{formatNumber(row.charges || 0, obscuredMode)}</td>
+                  <td className={row.netProfit >= 0 ? 'income-text' : 'expense-text'}>{formatNumber(row.netProfit || 0, obscuredMode)}</td>
                   <td>
                     <span className={`status-chip ${row.settled ? 'inactive' : 'active'}`}>
                       {row.settled ? 'Settled' : 'Open'}
