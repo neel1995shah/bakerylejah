@@ -106,6 +106,8 @@ router.post('/', verifyToken, async (req, res) => {
 
     const netProfit = safeOut - safeIn - safeCharges;
 
+    const entryCode = await generateNextEntryCode(PLEntry, date);
+
     const entry = await PLEntry.create({
       userId: req.userId,
       entryCode,

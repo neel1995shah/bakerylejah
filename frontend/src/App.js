@@ -139,6 +139,8 @@ function App() {
     setToken(token);
     setUsername(username);
     setIsLoggedIn(true);
+    localStorage.setItem('token', token);
+    localStorage.setItem('username', username);
     requestNativePermissions();
     registerPushSubscription(token).catch(err => {
       console.warn('Push registration failed:', err);

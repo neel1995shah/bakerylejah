@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const LedgerEntry = require('../models/LedgerEntry');
 const User = require('../models/User');
 const { JWT_SECRET } = require('../config/jwt');
@@ -45,6 +46,11 @@ const verifyToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = String(decoded?.userId || '');
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
     req.userId = decoded.userId;
     req.username = decoded.username;
     next();
@@ -116,6 +122,7 @@ router.post('/', verifyToken, async (req, res) => {
     const scopeQuery = await buildScopeQuery(req);
     const lastEntry = await LedgerEntry.findOne(scopeQuery).sort({ date: -1, createdAt: -1 });
     const previousTotal = lastEntry ? Number(lastEntry.total || 0) : 0;
+    const total = previousTotal + safeIn - safeOut;
     const entryCode = await generateNextEntryCode(LedgerEntry, date);
 
     const entry = await LedgerEntry.create({
