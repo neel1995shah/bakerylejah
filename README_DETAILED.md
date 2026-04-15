@@ -13,12 +13,14 @@ A full-stack web application for managing bakery finances with features for trac
 ## Technology Stack
 
 ### Backend
+
 - Node.js with Express.js
 - MongoDB
 - JWT Authentication
 - bcryptjs for PIN encryption
 
 ### Frontend
+
 - React 18
 - React Router v6
 - Axios for API calls
@@ -61,6 +63,7 @@ bakery/
 ## Setup Instructions
 
 ### Prerequisites
+
 - Node.js (v14 or higher)
 - MongoDB (running locally or MongoDB Atlas)
 - npm or yarn
@@ -68,11 +71,13 @@ bakery/
 ### Backend Setup
 
 1. Navigate to the backend directory:
+
 ```bash
 cd backend
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
@@ -82,27 +87,31 @@ npm install
    - Default: `mongodb://localhost:27017/bakery`
 
 4. Start the backend server:
+
 ```bash
 npm start
 # For development with auto-reload:
 npm run dev
 ```
 
-The backend will run on `http://localhost:5000`
+The backend will run on `http://localhost:5003`
 
 ### Frontend Setup
 
 1. Navigate to the frontend directory:
+
 ```bash
 cd frontend
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Start the development server:
+
 ```bash
 npm start
 ```
@@ -112,10 +121,11 @@ The frontend will open automatically at `http://localhost:3000`
 ## Default Test Credentials
 
 ### Creating a test user (Register first)
+
 When you first start the application, you can register a user through the backend API:
 
 ```bash
-curl -X POST http://localhost:5000/api/auth/register \
+curl -X POST http://localhost:5003/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",
@@ -124,16 +134,19 @@ curl -X POST http://localhost:5000/api/auth/register \
 ```
 
 Then login with:
+
 - Username: `testuser`
 - PIN: `1234`
 
 ## API Endpoints
 
 ### Authentication
+
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login with username and PIN
 
 ### Transactions
+
 - `GET /api/transactions` - Get all transactions
 - `POST /api/transactions` - Add new transaction
 - `GET /api/transactions/summary/pl` - Get P&L summary
@@ -141,19 +154,23 @@ Then login with:
 ## Usage Guide
 
 ### Login Page
+
 1. Enter your username and 4-digit PIN
 2. Click "Login" to access the dashboard
 
 ### P&L Page
+
 - View total income, total expenses, and net profit/loss
 - Data updates automatically based on recorded transactions
 
 ### Ledger Page
+
 - View all transactions in a table format
 - Filter by "All Transactions", "Income", or "Expenses"
 - See transaction details including date, category, amount, and description
 
 ### Accounts Page (Add Transaction)
+
 1. Select transaction type (Income or Expense)
 2. Choose category from dropdown
 3. Enter amount in rupees (₹)
@@ -163,6 +180,7 @@ Then login with:
 ## Database Schema
 
 ### User Model
+
 ```javascript
 {
   username: String (unique),
@@ -172,6 +190,7 @@ Then login with:
 ```
 
 ### Transaction Model
+
 ```javascript
 {
   userId: ObjectId (ref: User),
@@ -187,19 +206,23 @@ Then login with:
 ## Troubleshooting
 
 ### MongoDB Connection Error
+
 - Ensure MongoDB is running: `mongod`
 - Check connection string in `.env` file
 - If using MongoDB Atlas, update `.env` with your connection string
 
 ### Port Already in Use
-- Backend (port 5000): `lsof -ti:5000 | xargs kill -9`
+
+- Backend (port 5003): `lsof -ti:5003 | xargs kill -9`
 - Frontend (port 3000): `lsof -ti:3000 | xargs kill -9`
 
 ### CORS Errors
-- Ensure backend is running on port 5000
-- Check that frontend API calls use `http://localhost:5000`
+
+- Ensure backend is running on port 5003
+- Check that frontend API calls use `http://localhost:5003`
 
 ### Login Issues
+
 - Ensure PIN is exactly 4 digits
 - Verify user exists by registering first
 - Check JWT_SECRET in `.env` file

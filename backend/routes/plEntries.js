@@ -1,46 +1,24 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const PLEntry = require('../models/PLEntry');
-const User = require('../models/User');
 const { JWT_SECRET } = require('../config/jwt');
 const { broadcastRealtimeNotification, buildNotificationBody } = require('../utils/realtimeNotifications');
 const { applyEntryCodes, generateNextEntryCode } = require('../utils/entryCodes');
 
 const router = express.Router();
-const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
-const FIRM_USERNAME_REGEX = new RegExp(`^(${FIRM_NAMES.join('|')})$`, 'i');
-
-const normalizeName = (value) => (value || '').toLowerCase().trim();
-const isFirmMember = (username) => FIRM_NAMES.includes(normalizeName(username));
-
-const buildScopeQuery = async (req, extraQuery = {}) => {
-  if (!isFirmMember(req.username)) {
-    return {
-      ...extraQuery,
-      userId: req.userId
-    };
-  }
-
-  try {
-    const firmUsers = await User.find({ username: { $regex: FIRM_USERNAME_REGEX } }).select('_id');
-    const firmUserIds = firmUsers.map((user) => user._id);
-
-    return {
-      ...extraQuery,
-      userId: { $in: firmUserIds.length > 0 ? firmUserIds : [req.userId] }
-    };
-  } catch (err) {
-    return {
-      ...extraQuery,
-      userId: req.userId
-    };
-  }
+const buildScopeQuery = (req, extraQuery = {}) => {
+  return {
+    ...extraQuery,
+    userId: req.userId
+  };
 };
 
 const formatPLField = (field) => {
   if (field === 'in') return 'in';
   if (field === 'out') return 'out';
   if (field === 'acc') return 'account';
+  if (field === 'bonus') return 'bonus';
+  if (field === 'notes') return 'notes';
   return field;
 };
 
@@ -76,10 +54,11 @@ router.get('/', verifyToken, async (req, res) => {
         acc.totalIn += row.in;
         acc.totalOut += row.out;
         acc.totalCharges += row.charges;
+        acc.totalBonus += Number(row.bonus || 0);
         acc.totalNetProfit += row.netProfit;
         return acc;
       },
-      { totalIn: 0, totalOut: 0, totalCharges: 0, totalNetProfit: 0 }
+      { totalIn: 0, totalOut: 0, totalCharges: 0, totalBonus: 0, totalNetProfit: 0 }
     );
 
     return res.json({ entries, totals });
@@ -90,7 +69,7 @@ router.get('/', verifyToken, async (req, res) => {
 
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { date, handler, acc, in: amountIn, out, charges } = req.body;
+    const { date, handler, acc, in: amountIn, out, charges, bonus, notes } = req.body;
 
     if (!date || !handler || !acc) {
       return res.status(400).json({ message: 'date, handler, and acc are required' });
@@ -99,12 +78,18 @@ router.post('/', verifyToken, async (req, res) => {
     const safeIn = Number(amountIn || 0);
     const safeOut = Number(out || 0);
     const safeCharges = Number(charges || 0);
+    const safeBonus = Number(bonus || 0);
+    const safeNotes = String(notes || '').trim();
 
-    if ([safeIn, safeOut, safeCharges].some((num) => Number.isNaN(num) || num < 0)) {
-      return res.status(400).json({ message: 'in, out, and charges must be valid non-negative numbers' });
+    if ([safeIn, safeOut, safeCharges, safeBonus].some((num) => Number.isNaN(num) || num < 0)) {
+      return res.status(400).json({ message: 'in, out, charges, and bonus must be valid non-negative numbers' });
     }
 
-    const netProfit = safeOut - safeIn - safeCharges;
+    if (safeNotes.length > 500) {
+      return res.status(400).json({ message: 'notes must be 500 characters or fewer' });
+    }
+
+    const netProfit = safeOut + safeBonus - safeIn - safeCharges;
 
     const entryCode = await generateNextEntryCode(PLEntry, date);
 
@@ -117,6 +102,8 @@ router.post('/', verifyToken, async (req, res) => {
       in: safeIn,
       out: safeOut,
       charges: safeCharges,
+      bonus: safeBonus,
+      notes: safeNotes,
       settled: false,
       settledAt: null,
       netProfit
@@ -138,7 +125,7 @@ router.post('/', verifyToken, async (req, res) => {
 
 router.put('/:id', verifyToken, async (req, res) => {
   try {
-    const { date, handler, acc, in: amountIn, out, charges } = req.body;
+    const { date, handler, acc, in: amountIn, out, charges, bonus, notes } = req.body;
 
     if (!date || !handler || !acc) {
       return res.status(400).json({ message: 'date, handler, and acc are required' });
@@ -147,13 +134,19 @@ router.put('/:id', verifyToken, async (req, res) => {
     const safeIn = Number(amountIn || 0);
     const safeOut = Number(out || 0);
     const safeCharges = Number(charges || 0);
+    const safeBonus = Number(bonus || 0);
+    const safeNotes = String(notes || '').trim();
 
-    if ([safeIn, safeOut, safeCharges].some((num) => Number.isNaN(num) || num < 0)) {
-      return res.status(400).json({ message: 'in, out, and charges must be valid non-negative numbers' });
+    if ([safeIn, safeOut, safeCharges, safeBonus].some((num) => Number.isNaN(num) || num < 0)) {
+      return res.status(400).json({ message: 'in, out, charges, and bonus must be valid non-negative numbers' });
+    }
+
+    if (safeNotes.length > 500) {
+      return res.status(400).json({ message: 'notes must be 500 characters or fewer' });
     }
 
     const entryCode = await generateNextEntryCode(PLEntry, date);
-    const netProfit = safeOut - safeIn - safeCharges;
+    const netProfit = safeOut + safeBonus - safeIn - safeCharges;
 
     const scopedEntryQuery = await buildScopeQuery(req, { _id: req.params.id });
     const existingEntry = await PLEntry.findOne(scopedEntryQuery);
@@ -173,6 +166,8 @@ router.put('/:id', verifyToken, async (req, res) => {
     if (safeIn !== Number(existingEntry.in || 0)) changedFields.push(formatPLField('in'));
     if (safeOut !== Number(existingEntry.out || 0)) changedFields.push(formatPLField('out'));
     if (safeCharges !== Number(existingEntry.charges || 0)) changedFields.push(formatPLField('charges'));
+    if (safeBonus !== Number(existingEntry.bonus || 0)) changedFields.push(formatPLField('bonus'));
+    if (safeNotes !== String(existingEntry.notes || '')) changedFields.push(formatPLField('notes'));
 
     const detailedChanges = [];
     if (normalizeDateValue(date) !== normalizeDateValue(existingEntry.date)) {
@@ -217,6 +212,20 @@ router.put('/:id', verifyToken, async (req, res) => {
         newValue: safeCharges
       });
     }
+    if (safeBonus !== Number(existingEntry.bonus || 0)) {
+      detailedChanges.push({
+        field: 'bonus',
+        oldValue: existingEntry.bonus,
+        newValue: safeBonus
+      });
+    }
+    if (safeNotes !== String(existingEntry.notes || '')) {
+      detailedChanges.push({
+        field: 'notes',
+        oldValue: existingEntry.notes || '',
+        newValue: safeNotes
+      });
+    }
 
     const entry = await PLEntry.findOneAndUpdate(
       scopedEntryQuery,
@@ -227,6 +236,8 @@ router.put('/:id', verifyToken, async (req, res) => {
         in: safeIn,
         out: safeOut,
         charges: safeCharges,
+        bonus: safeBonus,
+        notes: safeNotes,
         netProfit
       },
       { new: true }
@@ -299,6 +310,11 @@ router.delete('/:id', verifyToken, async (req, res) => {
         {
           field: 'handler',
           oldValue: entry.handler,
+          newValue: '[deleted]'
+        },
+        {
+          field: 'notes',
+          oldValue: entry.notes || '',
           newValue: '[deleted]'
         }
       ]

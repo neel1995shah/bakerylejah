@@ -1,16 +1,10 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const Account = require('../models/Account');
-const User = require('../models/User');
 const { JWT_SECRET } = require('../config/jwt');
 const { broadcastRealtimeNotification, buildNotificationBody } = require('../utils/realtimeNotifications');
 
 const router = express.Router();
-const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
-const FIRM_USERNAME_REGEX = new RegExp(`^(${FIRM_NAMES.join('|')})$`, 'i');
-
-const normalizeName = (value) => (value || '').toLowerCase().trim();
-const isFirmMember = (username) => FIRM_NAMES.includes(normalizeName(username));
 const formatAccountField = (field) => {
   if (field === 'accountName') return 'account name';
   if (field === 'isActive') return 'status';
@@ -33,28 +27,11 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-const buildScopeQuery = async (req, extraQuery = {}) => {
-  if (!isFirmMember(req.username)) {
-    return {
-      ...extraQuery,
-      userId: req.userId
-    };
-  }
-
-  try {
-    const firmUsers = await User.find({ username: { $regex: FIRM_USERNAME_REGEX } }).select('_id');
-    const firmUserIds = firmUsers.map((user) => user._id);
-
-    return {
-      ...extraQuery,
-      userId: { $in: firmUserIds.length > 0 ? firmUserIds : [req.userId] }
-    };
-  } catch (err) {
-    return {
-      ...extraQuery,
-      userId: req.userId
-    };
-  }
+const buildScopeQuery = (req, extraQuery = {}) => {
+  return {
+    ...extraQuery,
+    userId: req.userId
+  };
 };
 
 router.get('/', verifyToken, async (req, res) => {

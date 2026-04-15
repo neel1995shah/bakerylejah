@@ -51,7 +51,15 @@ const Login = ({ onLogin }) => {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1>Financial Management System</h1>
+        <div className="login-image-wrap">
+          <img
+            className="login-image"
+            src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/San_Andreas_Fault_-_Carrizo_Plain%2C_California.jpg/1280px-San_Andreas_Fault_-_Carrizo_Plain%2C_California.jpg"
+            alt="San Andreas"
+            loading="lazy"
+          />
+        </div>
+        <h1>Cinderace Corporation System</h1>
         <h2>Login</h2>
         
         <form onSubmit={handleLogin}>

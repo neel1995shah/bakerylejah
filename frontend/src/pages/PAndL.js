@@ -21,7 +21,9 @@ const PAndL = ({ token, username }) => {
     acc: '',
     bet: '',
     win: '',
-    charges: ''
+    charges: '',
+    bonus: '',
+    notes: ''
   });
   const [accounts, setAccounts] = useState([]);
 
@@ -132,7 +134,9 @@ const PAndL = ({ token, username }) => {
         acc: formData.acc,
         in: Number(formData.bet || 0),
         out: Number(formData.win || 0),
-        charges: Number(formData.charges || 0)
+        charges: Number(formData.charges || 0),
+        bonus: Number(formData.bonus || 0),
+        notes: formData.notes || ''
       };
 
       if (editingEntryId) {
@@ -150,7 +154,9 @@ const PAndL = ({ token, username }) => {
         acc: '',
         bet: '',
         win: '',
-        charges: ''
+        charges: '',
+        bonus: '',
+        notes: ''
       });
       setMessage(editingEntryId ? 'P&L entry updated successfully.' : 'P&L entry added successfully.');
     } catch (err) {
@@ -168,7 +174,9 @@ const PAndL = ({ token, username }) => {
       acc: '',
       bet: '',
       win: '',
-      charges: ''
+      charges: '',
+      bonus: '',
+      notes: ''
     });
     setShowForm(true);
   };
@@ -186,7 +194,9 @@ const PAndL = ({ token, username }) => {
       acc: row.acc || '',
       bet: row.in ?? '',
       win: row.out ?? '',
-      charges: row.charges ?? ''
+      charges: row.charges ?? '',
+      bonus: row.bonus ?? '',
+      notes: row.notes ?? ''
     });
     setShowForm(true);
   };
@@ -227,7 +237,19 @@ const PAndL = ({ token, username }) => {
     }
 
     const dateText = new Date(row.date).toLocaleDateString('en-GB');
-    return [row.entryCode, row.handler, row.acc, row.in, row.out, row.charges, row.netProfit, dateText, row.settled ? 'settled' : 'open']
+    return [
+      row.entryCode,
+      row.handler,
+      row.acc,
+      row.in,
+      row.out,
+      row.charges,
+      row.bonus,
+      row.notes,
+      row.netProfit,
+      dateText,
+      row.settled ? 'settled' : 'open'
+    ]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query));
   });
@@ -254,12 +276,14 @@ const PAndL = ({ token, username }) => {
     const inVal = Number(row.in || 0);
     const outVal = Number(row.out || 0);
     const chgVal = Number(row.charges || 0);
+    const bonusVal = Number(row.bonus || 0);
     acc.totalIn += inVal;
     acc.totalOut += outVal;
     acc.totalCharges += chgVal;
-    acc.totalNetProfit += Number(row.netProfit || (inVal - outVal - chgVal));
+    acc.totalBonus += bonusVal;
+    acc.totalNetProfit += Number(row.netProfit || (outVal + bonusVal - inVal - chgVal));
     return acc;
-  }, { totalIn: 0, totalOut: 0, totalCharges: 0, totalNetProfit: 0 });
+  }, { totalIn: 0, totalOut: 0, totalCharges: 0, totalBonus: 0, totalNetProfit: 0 });
 
   const totalPages = Math.max(1, Math.ceil(sortedEntries.length / PAGE_SIZE));
   const paginatedEntries = sortedEntries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -323,6 +347,8 @@ const PAndL = ({ token, username }) => {
               <th>Bet</th>
               <th>Win</th>
               <th>Charges</th>
+              <th>Bonus</th>
+              <th>Notes</th>
               <th>Net Profit</th>
               <th>Status</th>
               <th>Action</th>
@@ -334,6 +360,8 @@ const PAndL = ({ token, username }) => {
               <td><strong>{formatNumber(filteredTotals.totalIn.toFixed(2), obscuredMode)}</strong></td>
               <td><strong>{formatNumber(filteredTotals.totalOut.toFixed(2), obscuredMode)}</strong></td>
               <td><strong>{formatNumber(filteredTotals.totalCharges.toFixed(2), obscuredMode)}</strong></td>
+              <td><strong>{formatNumber(filteredTotals.totalBonus.toFixed(2), obscuredMode)}</strong></td>
+              <td />
               <td className={filteredTotals.totalNetProfit >= 0 ? 'income-text' : 'expense-text'}>
                 <strong>{formatNumber(filteredTotals.totalNetProfit.toFixed(2), obscuredMode)}</strong>
               </td>
@@ -350,6 +378,8 @@ const PAndL = ({ token, username }) => {
                   <td>{formatNumber(row.in || 0, obscuredMode)}</td>
                   <td>{formatNumber(row.out || 0, obscuredMode)}</td>
                   <td>{formatNumber(row.charges || 0, obscuredMode)}</td>
+                  <td>{formatNumber(row.bonus || 0, obscuredMode)}</td>
+                  <td>{row.notes || '-'}</td>
                   <td className={row.netProfit >= 0 ? 'income-text' : 'expense-text'}>{formatNumber(row.netProfit || 0, obscuredMode)}</td>
                   <td>
                     <span className={`status-chip ${row.settled ? 'inactive' : 'active'}`}>
@@ -386,7 +416,7 @@ const PAndL = ({ token, username }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="no-data">No P&L rows match the current search.</td>
+                <td colSpan="12" className="no-data">No P&L rows match the current search.</td>
               </tr>
             )}
           </tbody>
@@ -491,6 +521,24 @@ const PAndL = ({ token, username }) => {
               <div className="form-group">
                 <label htmlFor="charges">Charges</label>
                 <input id="charges" type="number" name="charges" value={formData.charges} onChange={handleChange} min="0" step="0.01" />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="bonus">Bonus</label>
+                <input id="bonus" type="number" name="bonus" value={formData.bonus} onChange={handleChange} min="0" step="0.01" />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="notes">Notes</label>
+                <textarea
+                  id="notes"
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  placeholder="Optional notes"
+                  maxLength="500"
+                  rows="3"
+                />
               </div>
 
               <div className="pl-modal-actions">

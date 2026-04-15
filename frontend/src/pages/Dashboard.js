@@ -198,6 +198,7 @@ const Dashboard = ({ token, username }) => {
               <th>Bet</th>
               <th>Win</th>
               <th>Charges</th>
+              <th>Bonus</th>
               <th>Net Profit</th>
             </tr>
           </thead>
@@ -212,6 +213,7 @@ const Dashboard = ({ token, username }) => {
                   <td>{formatNumber(Number(entry.in || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
                   <td>{formatNumber(Number(entry.out || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
                   <td>{formatNumber(Number(entry.charges || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
+                  <td>{formatNumber(Number(entry.bonus || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}</td>
                   <td className={Number(entry.netProfit || 0) >= 0 ? 'income-text' : 'expense-text'}>
                     {formatNumber(Number(entry.netProfit || 0).toFixed(2).replace(/\.00$/, ''), obscuredMode)}
                   </td>
@@ -219,7 +221,7 @@ const Dashboard = ({ token, username }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="no-data">No non-settled P&L entries.</td>
+                <td colSpan="9" className="no-data">No non-settled P&L entries.</td>
               </tr>
             )}
           </tbody>

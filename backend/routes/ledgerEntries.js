@@ -2,40 +2,16 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const LedgerEntry = require('../models/LedgerEntry');
-const User = require('../models/User');
 const { JWT_SECRET } = require('../config/jwt');
 const { broadcastRealtimeNotification, buildNotificationBody } = require('../utils/realtimeNotifications');
 const { applyEntryCodes, generateNextEntryCode } = require('../utils/entryCodes');
 
 const router = express.Router();
-const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
-const FIRM_USERNAME_REGEX = new RegExp(`^(${FIRM_NAMES.join('|')})$`, 'i');
-
-const normalizeName = (value) => (value || '').toLowerCase().trim();
-const isFirmMember = (username) => FIRM_NAMES.includes(normalizeName(username));
-
-const buildScopeQuery = async (req, extraQuery = {}) => {
-  if (!isFirmMember(req.username)) {
-    return {
-      ...extraQuery,
-      userId: req.userId
-    };
-  }
-
-  try {
-    const firmUsers = await User.find({ username: { $regex: FIRM_USERNAME_REGEX } }).select('_id');
-    const firmUserIds = firmUsers.map((user) => user._id);
-
-    return {
-      ...extraQuery,
-      userId: { $in: firmUserIds.length > 0 ? firmUserIds : [req.userId] }
-    };
-  } catch (err) {
-    return {
-      ...extraQuery,
-      userId: req.userId
-    };
-  }
+const buildScopeQuery = (req, extraQuery = {}) => {
+  return {
+    ...extraQuery,
+    userId: req.userId
+  };
 };
 
 const verifyToken = (req, res, next) => {

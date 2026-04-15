@@ -45,6 +45,18 @@ const plEntrySchema = new mongoose.Schema({
     min: 0,
     default: 0
   },
+  bonus: {
+    type: Number,
+    required: true,
+    min: 0,
+    default: 0
+  },
+  notes: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: 500
+  },
   settled: {
     type: Boolean,
     default: false

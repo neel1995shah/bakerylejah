@@ -9,6 +9,8 @@ const app = express();
 const server = http.createServer(app);
 const activeUsers = new Map();
 
+app.disable('x-powered-by');
+
 // Configure CORS with multiple frontend URLs
 const allowedOrigins = [
   process.env.FRONTEND_URL,
@@ -93,7 +95,8 @@ app.use((req, res, next) => {
 
   return next();
 });
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
@@ -110,7 +113,7 @@ app.use('/api/crypto', require('./routes/crypto'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/push', require('./routes/push'));
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5003;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
