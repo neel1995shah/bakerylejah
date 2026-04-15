@@ -25,10 +25,8 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Create JWT token
-    const token = jwt.sign({ userId: user._id, username: user.username }, JWT_SECRET, {
-      expiresIn: '24h'
-    });
+    // Create JWT token without expiry so session ends only on explicit logout.
+    const token = jwt.sign({ userId: user._id, username: user.username }, JWT_SECRET);
 
     res.json({ token, username: user.username });
   } catch (err) {
