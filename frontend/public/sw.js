@@ -5,9 +5,21 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  if (event.request.url.includes('/api/')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request).catch(error => {
-      return caches.match(event.request);
+      return caches.match(event.request).then(response => {
+        if (response) {
+          return response;
+        }
+        return new Response('Network error occurred', {
+          status: 408,
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      });
     })
   );
 });
