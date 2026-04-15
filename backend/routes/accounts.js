@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const Account = require('../models/Account');
 const User = require('../models/User');
 const { JWT_SECRET } = require('../config/jwt');
+const { broadcastRealtimeNotification, buildNotificationBody } = require('../utils/realtimeNotifications');
 
 const router = express.Router();
 const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
@@ -10,6 +11,11 @@ const FIRM_USERNAME_REGEX = new RegExp(`^(${FIRM_NAMES.join('|')})$`, 'i');
 
 const normalizeName = (value) => (value || '').toLowerCase().trim();
 const isFirmMember = (username) => FIRM_NAMES.includes(normalizeName(username));
+const formatAccountField = (field) => {
+  if (field === 'accountName') return 'account name';
+  if (field === 'isActive') return 'status';
+  return field;
+};
 
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -81,10 +87,12 @@ router.post('/', verifyToken, async (req, res) => {
       isActive: typeof isActive === 'boolean' ? isActive : true
     });
 
-    req.app.get('io').emit('realtime-update', {
-      action: 'added a new account',
+    await broadcastRealtimeNotification(req.app.get('io'), {
+      actionType: 'A',
+      entryType: 'ACC',
       user: req.username,
-      module: 'Accounts'
+      entryCode: '',
+      detailedChanges: []
     });
 
     return res.status(201).json(account);
@@ -111,6 +119,42 @@ router.put('/:id', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'handler, accountName, and password are required' });
     }
 
+    const changedFields = [];
+    if (safeHandler !== existing.handler) changedFields.push(formatAccountField('handler'));
+    if (safeAccountName !== existing.accountName) changedFields.push(formatAccountField('accountName'));
+    if (safePassword !== existing.password) changedFields.push(formatAccountField('password'));
+    if (typeof isActive === 'boolean' && isActive !== existing.isActive) changedFields.push(formatAccountField('isActive'));
+
+    const detailedChanges = [];
+    if (safeHandler !== existing.handler) {
+      detailedChanges.push({
+        field: 'handler',
+        oldValue: existing.handler,
+        newValue: safeHandler
+      });
+    }
+    if (safeAccountName !== existing.accountName) {
+      detailedChanges.push({
+        field: 'account name',
+        oldValue: existing.accountName,
+        newValue: safeAccountName
+      });
+    }
+    if (safePassword !== existing.password) {
+      detailedChanges.push({
+        field: 'password',
+        oldValue: existing.password,
+        newValue: safePassword
+      });
+    }
+    if (typeof isActive === 'boolean' && isActive !== existing.isActive) {
+      detailedChanges.push({
+        field: 'status',
+        oldValue: existing.isActive ? 'active' : 'inactive',
+        newValue: isActive ? 'active' : 'inactive'
+      });
+    }
+
     const updated = await Account.findOneAndUpdate(
       scopeQuery,
       {
@@ -122,10 +166,12 @@ router.put('/:id', verifyToken, async (req, res) => {
       { new: true }
     );
 
-    req.app.get('io').emit('realtime-update', {
-      action: 'updated an account',
+    await broadcastRealtimeNotification(req.app.get('io'), {
+      actionType: 'U',
+      entryType: 'ACC',
       user: req.username,
-      module: 'Accounts'
+      entryCode: '',
+      detailedChanges: detailedChanges
     });
 
     return res.json(updated);
@@ -148,7 +194,7 @@ router.put('/:id/status', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Account not found' });
     }
 
-    req.app.get('io').emit('realtime-update', {
+    await broadcastRealtimeNotification(req.app.get('io'), {
       action: isActive ? 'activated an account' : 'deactivated an account',
       user: req.username,
       module: 'Accounts'
@@ -169,10 +215,18 @@ router.delete('/:id', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Account not found' });
     }
 
-    req.app.get('io').emit('realtime-update', {
-      action: 'deleted an account',
+    await broadcastRealtimeNotification(req.app.get('io'), {
+      actionType: 'D',
+      entryType: 'ACC',
       user: req.username,
-      module: 'Accounts'
+      entryCode: '',
+      detailedChanges: [
+        {
+          field: 'handler',
+          oldValue: deleted.handler,
+          newValue: '[deleted]'
+        }
+      ]
     });
 
     return res.json({ message: 'Account deleted successfully' });

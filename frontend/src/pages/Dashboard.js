@@ -144,6 +144,7 @@ const Dashboard = ({ token, username }) => {
           <thead>
             <tr>
               <th>Date</th>
+              <th>Index</th>
               <th>Name</th>
               <th>In</th>
               <th>Out</th>
@@ -155,6 +156,7 @@ const Dashboard = ({ token, username }) => {
               nonSettledLedgerEntries.map((entry) => (
                 <tr key={entry._id}>
                   <td>{new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</td>
+                  <td>{entry.entryCode || '-'}</td>
                   <td>{entry.name}</td>
                   <td>{Number(entry.in || 0).toFixed(2).replace(/\.00$/, '')}</td>
                   <td>{Number(entry.out || 0).toFixed(2).replace(/\.00$/, '')}</td>
@@ -165,7 +167,7 @@ const Dashboard = ({ token, username }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="no-data">No non-settled Ledger entries.</td>
+                <td colSpan="6" className="no-data">No non-settled Ledger entries.</td>
               </tr>
             )}
           </tbody>
@@ -178,6 +180,7 @@ const Dashboard = ({ token, username }) => {
           <thead>
             <tr>
               <th>Date</th>
+              <th>Index</th>
               <th>Handler</th>
               <th>Acc</th>
               <th>Bet</th>
@@ -191,6 +194,7 @@ const Dashboard = ({ token, username }) => {
               nonSettledEntries.map((entry) => (
                 <tr key={entry._id}>
                   <td>{new Date(entry.date).toLocaleDateString('en-GB')}</td>
+                  <td>{entry.entryCode || '-'}</td>
                   <td>{entry.handler}</td>
                   <td>{entry.acc}</td>
                   <td>{Number(entry.in || 0).toFixed(2).replace(/\.00$/, '')}</td>
@@ -203,7 +207,7 @@ const Dashboard = ({ token, username }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="7" className="no-data">No non-settled P&L entries.</td>
+                <td colSpan="8" className="no-data">No non-settled P&L entries.</td>
               </tr>
             )}
           </tbody>

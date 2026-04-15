@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const PLEntry = require('../models/PLEntry');
 const User = require('../models/User');
 const { JWT_SECRET } = require('../config/jwt');
+const { broadcastRealtimeNotification, buildNotificationBody } = require('../utils/realtimeNotifications');
+const { applyEntryCodes, generateNextEntryCode } = require('../utils/entryCodes');
 
 const router = express.Router();
 const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
@@ -35,6 +37,18 @@ const buildScopeQuery = async (req, extraQuery = {}) => {
   }
 };
 
+const formatPLField = (field) => {
+  if (field === 'in') return 'in';
+  if (field === 'out') return 'out';
+  if (field === 'acc') return 'account';
+  return field;
+};
+
+const normalizeDateValue = (value) => {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
+};
+
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
   if (!token) {
@@ -55,6 +69,7 @@ router.get('/', verifyToken, async (req, res) => {
   try {
     const scopeQuery = await buildScopeQuery(req);
     const entries = await PLEntry.find(scopeQuery).sort({ date: -1, createdAt: -1 });
+    applyEntryCodes(entries);
 
     const totals = entries.reduce(
       (acc, row) => {
@@ -93,6 +108,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     const entry = await PLEntry.create({
       userId: req.userId,
+      entryCode,
       date,
       handler,
       acc,
@@ -104,10 +120,12 @@ router.post('/', verifyToken, async (req, res) => {
       netProfit
     });
 
-    req.app.get('io').emit('realtime-update', {
-      action: 'added a new entry',
+    await broadcastRealtimeNotification(req.app.get('io'), {
+      actionType: 'A',
+      entryType: 'P&L',
       user: req.username,
-      module: 'P&L'
+      entryCode: entryCode,
+      detailedChanges: []
     });
 
     return res.status(201).json(entry);
@@ -132,6 +150,7 @@ router.put('/:id', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'in, out, and charges must be valid non-negative numbers' });
     }
 
+    const entryCode = await generateNextEntryCode(PLEntry, date);
     const netProfit = safeOut - safeIn - safeCharges;
 
     const scopedEntryQuery = await buildScopeQuery(req, { _id: req.params.id });
@@ -143,6 +162,58 @@ router.put('/:id', verifyToken, async (req, res) => {
 
     if (existingEntry.settled) {
       return res.status(400).json({ message: 'Settled entries cannot be edited' });
+    }
+
+    const changedFields = [];
+    if (normalizeDateValue(date) !== normalizeDateValue(existingEntry.date)) changedFields.push(formatPLField('date'));
+    if (handler !== existingEntry.handler) changedFields.push(formatPLField('handler'));
+    if (acc !== existingEntry.acc) changedFields.push(formatPLField('acc'));
+    if (safeIn !== Number(existingEntry.in || 0)) changedFields.push(formatPLField('in'));
+    if (safeOut !== Number(existingEntry.out || 0)) changedFields.push(formatPLField('out'));
+    if (safeCharges !== Number(existingEntry.charges || 0)) changedFields.push(formatPLField('charges'));
+
+    const detailedChanges = [];
+    if (normalizeDateValue(date) !== normalizeDateValue(existingEntry.date)) {
+      detailedChanges.push({
+        field: 'date',
+        oldValue: new Date(existingEntry.date).toLocaleDateString(),
+        newValue: new Date(date).toLocaleDateString()
+      });
+    }
+    if (handler !== existingEntry.handler) {
+      detailedChanges.push({
+        field: 'handler',
+        oldValue: existingEntry.handler,
+        newValue: handler
+      });
+    }
+    if (acc !== existingEntry.acc) {
+      detailedChanges.push({
+        field: 'account',
+        oldValue: existingEntry.acc,
+        newValue: acc
+      });
+    }
+    if (safeIn !== Number(existingEntry.in || 0)) {
+      detailedChanges.push({
+        field: 'in',
+        oldValue: existingEntry.in,
+        newValue: safeIn
+      });
+    }
+    if (safeOut !== Number(existingEntry.out || 0)) {
+      detailedChanges.push({
+        field: 'out',
+        oldValue: existingEntry.out,
+        newValue: safeOut
+      });
+    }
+    if (safeCharges !== Number(existingEntry.charges || 0)) {
+      detailedChanges.push({
+        field: 'charges',
+        oldValue: existingEntry.charges,
+        newValue: safeCharges
+      });
     }
 
     const entry = await PLEntry.findOneAndUpdate(
@@ -159,10 +230,12 @@ router.put('/:id', verifyToken, async (req, res) => {
       { new: true }
     );
 
-    req.app.get('io').emit('realtime-update', {
-      action: 'updated an entry',
+    await broadcastRealtimeNotification(req.app.get('io'), {
+      actionType: 'U',
+      entryType: 'P&L',
       user: req.username,
-      module: 'P&L'
+      entryCode: existingEntry.entryCode,
+      detailedChanges: detailedChanges
     });
 
     return res.json(entry);
@@ -188,7 +261,7 @@ router.put('/:id/settle', verifyToken, async (req, res) => {
     entry.settledAt = new Date();
     await entry.save();
 
-    req.app.get('io').emit('realtime-update', {
+    await broadcastRealtimeNotification(req.app.get('io'), {
       action: 'settled an entry',
       user: req.username,
       module: 'P&L'
@@ -215,10 +288,18 @@ router.delete('/:id', verifyToken, async (req, res) => {
 
     await PLEntry.deleteOne({ _id: entry._id });
 
-    req.app.get('io').emit('realtime-update', {
-      action: 'deleted an entry',
+    await broadcastRealtimeNotification(req.app.get('io'), {
+      actionType: 'D',
+      entryType: 'P&L',
       user: req.username,
-      module: 'P&L'
+      entryCode: entry.entryCode,
+      detailedChanges: [
+        {
+          field: 'handler',
+          oldValue: entry.handler,
+          newValue: '[deleted]'
+        }
+      ]
     });
 
     return res.json({ message: 'P&L entry deleted successfully' });

@@ -6,6 +6,13 @@ const ledgerEntrySchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  entryCode: {
+    type: String,
+    trim: true,
+    index: true,
+    sparse: true,
+    unique: true
+  },
   date: {
     type: Date,
     required: true
@@ -47,5 +54,7 @@ const ledgerEntrySchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+ledgerEntrySchema.index({ userId: 1, date: -1, createdAt: -1 });
 
 module.exports = mongoose.model('LedgerEntry', ledgerEntrySchema);

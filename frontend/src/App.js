@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -9,6 +9,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from './utils/socket';
 import { handleNotificationPulse, requestNativePermissions } from './utils/notifications';
+import { registerPushSubscription } from './utils/push';
 import './App.css';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
   const [username, setUsername] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [showBell, setShowBell] = useState(false);
+  const pushSetupRef = useRef(false);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -40,10 +42,38 @@ function App() {
       localStorage.setItem('token', token);
       localStorage.setItem('username', username);
       requestNativePermissions();
+      if (!socket.connected) {
+        socket.connect();
+      }
     } else {
       localStorage.removeItem('token');
       localStorage.removeItem('username');
     }
+  }, [token, username]);
+
+  useEffect(() => {
+    if (!token || !username) {
+      return undefined;
+    }
+
+    if (!pushSetupRef.current) {
+      registerPushSubscription(token).catch(err => {
+        console.warn('Push registration failed:', err);
+      });
+      pushSetupRef.current = true;
+    }
+
+    const registerUser = () => socket.emit('register-user', username);
+
+    if (socket.connected) {
+      registerUser();
+    } else {
+      socket.on('connect', registerUser);
+    }
+
+    return () => {
+      socket.off('connect', registerUser);
+    };
   }, [token, username]);
 
   useEffect(() => {
@@ -53,11 +83,15 @@ function App() {
       if (payload && payload.action) {
         const qualifyForHistory = handleNotificationPulse(payload, username);
         if (qualifyForHistory) {
+          const actorInitial = payload.actorInitial || (payload.user ? payload.user.trim().charAt(0).toUpperCase() : '');
           const newNotif = {
             id: Date.now(),
             action: payload.action,
             user: payload.user,
             module: payload.module,
+            body: payload.body,
+            actorInitial,
+            changes: payload.changes || [],
             date: new Date().toISOString(),
             read: false
           };
@@ -77,12 +111,18 @@ function App() {
   }, [token, username]);
 
   const handleLogin = (token, username) => {
+    pushSetupRef.current = true;
     setToken(token);
     setUsername(username);
     setIsLoggedIn(true);
+    requestNativePermissions();
+    registerPushSubscription(token).catch(err => {
+      console.warn('Push registration failed:', err);
+    });
   };
 
   const handleLogout = () => {
+    socket.disconnect();
     setToken('');
     setUsername('');
     setNotifications([]);
@@ -152,7 +192,7 @@ function App() {
                       ) : (
                         notifications.map(n => (
                           <div key={n.id} className={`notification-item ${n.read ? '' : 'unread'}`}>
-                            <strong>{n.user.toUpperCase()}</strong> {n.action} inside <strong>{n.module}</strong>
+                            <strong>{n.actorInitial || (n.user ? n.user.charAt(0).toUpperCase() : '')}</strong> {n.body || `${n.action} inside ${n.module}`}
                             <span className="notification-time">
                               {new Date(n.date).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                             </span>

@@ -215,7 +215,7 @@ const PAndL = ({ token, username }) => {
     }
 
     const dateText = new Date(row.date).toLocaleDateString('en-GB');
-    return [row.handler, row.acc, row.in, row.out, row.charges, row.netProfit, dateText, row.settled ? 'settled' : 'open']
+    return [row.entryCode, row.handler, row.acc, row.in, row.out, row.charges, row.netProfit, dateText, row.settled ? 'settled' : 'open']
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query));
   });
@@ -275,7 +275,7 @@ const PAndL = ({ token, username }) => {
               setCurrentPage(1);
               setSearchTerm(e.target.value);
             }}
-            placeholder="Search handler, acc, amount, date"
+            placeholder="Search index, handler, acc, amount, date"
           />
         </div>
         <div className="form-group filter-group">
@@ -305,6 +305,7 @@ const PAndL = ({ token, username }) => {
           <thead>
             <tr>
               <th>Date</th>
+              <th>Index</th>
               <th>Handler</th>
               <th>Acc</th>
               <th>Bet</th>
@@ -317,7 +318,7 @@ const PAndL = ({ token, username }) => {
           </thead>
           <tbody>
             <tr className="pl-total-row">
-              <td colSpan="3"><strong>Total</strong></td>
+              <td colSpan="4"><strong>Total</strong></td>
               <td><strong>{filteredTotals.totalIn.toFixed(2)}</strong></td>
               <td><strong>{filteredTotals.totalOut.toFixed(2)}</strong></td>
               <td><strong>{filteredTotals.totalCharges.toFixed(2)}</strong></td>
@@ -331,6 +332,7 @@ const PAndL = ({ token, username }) => {
               paginatedEntries.map((row) => (
                 <tr key={row._id} className={row.settled ? 'account-row-inactive' : ''}>
                   <td>{new Date(row.date).toLocaleDateString('en-GB')}</td>
+                  <td>{row.entryCode || '-'}</td>
                   <td>{row.handler}</td>
                   <td>{row.acc}</td>
                   <td>{row.in || 0}</td>
@@ -372,7 +374,7 @@ const PAndL = ({ token, username }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="9" className="no-data">No P&L rows match the current search.</td>
+                <td colSpan="10" className="no-data">No P&L rows match the current search.</td>
               </tr>
             )}
           </tbody>

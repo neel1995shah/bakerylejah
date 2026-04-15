@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const LedgerEntry = require('../models/LedgerEntry');
 const User = require('../models/User');
 const { JWT_SECRET } = require('../config/jwt');
+const { broadcastRealtimeNotification, buildNotificationBody } = require('../utils/realtimeNotifications');
+const { applyEntryCodes, generateNextEntryCode } = require('../utils/entryCodes');
 
 const router = express.Router();
 const FIRM_NAMES = ['krish', 'harsh', 'harssh', 'meet'];
@@ -73,10 +75,22 @@ const recalculateTotals = async (scopeQuery) => {
   }
 };
 
+const formatLedgerField = (field) => {
+  if (field === 'in') return 'in';
+  if (field === 'out') return 'out';
+  return field;
+};
+
+const normalizeDateValue = (value) => {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
+};
+
 router.get('/', verifyToken, async (req, res) => {
   try {
     const scopeQuery = await buildScopeQuery(req);
     const entries = await LedgerEntry.find(scopeQuery).sort({ date: 1, createdAt: 1 });
+    applyEntryCodes(entries);
     const rows = buildRunningEntries(entries);
     res.json(rows.reverse());
   } catch (err) {
@@ -102,10 +116,11 @@ router.post('/', verifyToken, async (req, res) => {
     const scopeQuery = await buildScopeQuery(req);
     const lastEntry = await LedgerEntry.findOne(scopeQuery).sort({ date: -1, createdAt: -1 });
     const previousTotal = lastEntry ? Number(lastEntry.total || 0) : 0;
-    const total = previousTotal + safeIn - safeOut;
+    const entryCode = await generateNextEntryCode(LedgerEntry, date);
 
     const entry = await LedgerEntry.create({
       userId: req.userId,
+      entryCode,
       date,
       name,
       in: safeIn,
@@ -116,10 +131,12 @@ router.post('/', verifyToken, async (req, res) => {
       total
     });
 
-    req.app.get('io').emit('realtime-update', {
-      action: 'added a new entry',
+    await broadcastRealtimeNotification(req.app.get('io'), {
+      actionType: 'A',
+      entryType: 'LED',
       user: req.username,
-      module: 'Ledger'
+      entryCode: entryCode,
+      detailedChanges: []
     });
 
     res.status(201).json(entry);
@@ -158,6 +175,44 @@ router.put('/:id', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'This entry can only be edited once' });
     }
 
+    const changedFields = [];
+    if (normalizeDateValue(date) !== normalizeDateValue(existingEntry.date)) {
+      changedFields.push(formatLedgerField('date'));
+    }
+    if (name !== existingEntry.name) changedFields.push(formatLedgerField('name'));
+    if (safeIn !== Number(existingEntry.in || 0)) changedFields.push(formatLedgerField('in'));
+    if (safeOut !== Number(existingEntry.out || 0)) changedFields.push(formatLedgerField('out'));
+
+    const detailedChanges = [];
+    if (normalizeDateValue(date) !== normalizeDateValue(existingEntry.date)) {
+      detailedChanges.push({
+        field: 'date',
+        oldValue: new Date(existingEntry.date).toLocaleDateString(),
+        newValue: new Date(date).toLocaleDateString()
+      });
+    }
+    if (name !== existingEntry.name) {
+      detailedChanges.push({
+        field: 'name',
+        oldValue: existingEntry.name,
+        newValue: name
+      });
+    }
+    if (safeIn !== Number(existingEntry.in || 0)) {
+      detailedChanges.push({
+        field: 'in',
+        oldValue: existingEntry.in,
+        newValue: safeIn
+      });
+    }
+    if (safeOut !== Number(existingEntry.out || 0)) {
+      detailedChanges.push({
+        field: 'out',
+        oldValue: existingEntry.out,
+        newValue: safeOut
+      });
+    }
+
     const entry = await LedgerEntry.findOneAndUpdate(
       scopedEntryQuery,
       {
@@ -174,10 +229,12 @@ router.put('/:id', verifyToken, async (req, res) => {
     await recalculateTotals(scopeQuery);
     const refreshed = await LedgerEntry.findOne(scopedEntryQuery);
 
-    req.app.get('io').emit('realtime-update', {
-      action: 'updated an entry',
+    await broadcastRealtimeNotification(req.app.get('io'), {
+      actionType: 'U',
+      entryType: 'LED',
       user: req.username,
-      module: 'Ledger'
+      entryCode: existingEntry.entryCode,
+      detailedChanges: detailedChanges
     });
 
     res.json(refreshed);
@@ -203,7 +260,7 @@ router.put('/:id/settle', verifyToken, async (req, res) => {
     entry.settledAt = new Date();
     await entry.save();
 
-    req.app.get('io').emit('realtime-update', {
+    await broadcastRealtimeNotification(req.app.get('io'), {
       action: 'settled an entry',
       user: req.username,
       module: 'Ledger'
@@ -232,10 +289,18 @@ router.delete('/:id', verifyToken, async (req, res) => {
     const scopeQuery = await buildScopeQuery(req);
     await recalculateTotals(scopeQuery);
 
-    req.app.get('io').emit('realtime-update', {
-      action: 'deleted an entry',
+    await broadcastRealtimeNotification(req.app.get('io'), {
+      actionType: 'D',
+      entryType: 'LED',
       user: req.username,
-      module: 'Ledger'
+      entryCode: entry.entryCode,
+      detailedChanges: [
+        {
+          field: 'name',
+          oldValue: entry.name,
+          newValue: '[deleted]'
+        }
+      ]
     });
 
     return res.json({ message: 'Ledger entry deleted successfully' });

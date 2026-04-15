@@ -86,7 +86,7 @@ const Ledger = ({ token, username }) => {
     }
 
     const dateText = new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    return [entry.name, entry.in, entry.out, entry.total, dateText, entry.settled ? 'settled' : 'open']
+    return [entry.entryCode, entry.name, entry.in, entry.out, entry.total, dateText, entry.settled ? 'settled' : 'open']
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query));
   });
@@ -245,7 +245,7 @@ const Ledger = ({ token, username }) => {
               setCurrentPage(1);
               setSearchTerm(e.target.value);
             }}
-            placeholder="Search name, amount, date, status"
+            placeholder="Search index, name, amount, date, status"
           />
         </div>
         <div className="form-group filter-group">
@@ -275,6 +275,7 @@ const Ledger = ({ token, username }) => {
           <thead>
             <tr>
               <th>Date</th>
+              <th>Index</th>
               <th>Name</th>
               <th>In</th>
               <th>Out</th>
@@ -285,7 +286,7 @@ const Ledger = ({ token, username }) => {
           </thead>
           <tbody>
             <tr className="pl-total-row">
-              <td colSpan="4"><strong>Current Total</strong></td>
+              <td colSpan="5"><strong>Current Total</strong></td>
               <td className={filteredTotalBalance >= 0 ? 'income-text' : 'expense-text'}>
                 <strong>{Number(filteredTotalBalance || 0).toFixed(3).replace(/\.?0+$/, '')}</strong>
               </td>
@@ -296,6 +297,7 @@ const Ledger = ({ token, username }) => {
               paginatedEntries.map((entry) => (
                 <tr key={entry._id} className={entry.settled ? 'account-row-inactive' : ''}>
                   <td>{new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</td>
+                  <td>{entry.entryCode || '-'}</td>
                   <td>{entry.name}</td>
                   <td>{Number(entry.in || 0).toFixed(2).replace(/\.00$/, '')}</td>
                   <td>{Number(entry.out || 0).toFixed(2).replace(/\.00$/, '')}</td>
@@ -337,7 +339,7 @@ const Ledger = ({ token, username }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="7" className="no-data">No ledger transactions match the current search.</td>
+                <td colSpan="8" className="no-data">No ledger transactions match the current search.</td>
               </tr>
             )}
           </tbody>

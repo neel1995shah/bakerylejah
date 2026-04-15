@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
+const activeUsers = new Map();
 
 // Configure CORS with multiple frontend URLs
 const allowedOrigins = [
@@ -35,6 +36,48 @@ const io = new Server(server, {
   cors: corsOptions
 });
 app.set('io', io);
+io.activeUsers = activeUsers;
+
+io.on('connection', (socket) => {
+  socket.on('register-user', (username) => {
+    const key = String(username || '').toLowerCase().trim();
+    if (!key) {
+      return;
+    }
+
+    const currentCount = activeUsers.get(key) || 0;
+    activeUsers.set(key, currentCount + 1);
+    socket.data.username = key;
+  });
+
+  socket.on('unregister-user', (username) => {
+    const key = String(username || socket.data.username || '').toLowerCase().trim();
+    if (!key || !activeUsers.has(key)) {
+      return;
+    }
+
+    const nextCount = (activeUsers.get(key) || 1) - 1;
+    if (nextCount > 0) {
+      activeUsers.set(key, nextCount);
+    } else {
+      activeUsers.delete(key);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    const key = socket.data.username;
+    if (!key || !activeUsers.has(key)) {
+      return;
+    }
+
+    const nextCount = (activeUsers.get(key) || 1) - 1;
+    if (nextCount > 0) {
+      activeUsers.set(key, nextCount);
+    } else {
+      activeUsers.delete(key);
+    }
+  });
+});
 
 // Middleware
 app.use(cors(corsOptions));
@@ -58,6 +101,7 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/pl-entries', require('./routes/plEntries'));
 app.use('/api/ledger-entries', require('./routes/ledgerEntries'));
 app.use('/api/accounts', require('./routes/accounts'));
+app.use('/api/push', require('./routes/push'));
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

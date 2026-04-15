@@ -1,6 +1,22 @@
 import { toast } from 'react-toastify';
 import { isFirmMember } from './auth';
 
+const formatActorInitial = (username) => {
+  const value = String(username || '').trim();
+  return value ? value.charAt(0).toUpperCase() : '';
+};
+
+const buildNotificationText = (payload) => {
+  const actor = payload.actorInitial || formatActorInitial(payload.user);
+  if (payload.body) {
+    return payload.body;
+  }
+
+  const action = payload.action || 'updated something';
+  const module = payload.module || 'Updates';
+  return `${actor} ${action} inside ${module}`.trim();
+};
+
 export const requestNativePermissions = () => {
   if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
     Notification.requestPermission().catch(err => console.warn('Notification permission dismissed:', err));
@@ -33,14 +49,14 @@ export const handleNotificationPulse = (payload, currentUser) => {
   if ('Notification' in window && Notification.permission === 'granted' && navigator.serviceWorker) {
     navigator.serviceWorker.ready.then(registration => {
       registration.showNotification(`Gamdom Alert`, {
-        body: `${user.toUpperCase()} ${action} inside ${module}`,
+        body: buildNotificationText(payload),
         icon: '/logo_embedded.svg',
         vibrate: [200, 100, 200]
       });
     }).catch(e => console.warn('Service worker notification failed:', e));
   }
 
-  toast.info(`${user.toUpperCase()} ${action} inside ${module}!`, {
+  toast.info(`${buildNotificationText(payload)}!`, {
     position: "top-right",
     autoClose: 6000,
     hideProgressBar: false,

@@ -6,6 +6,13 @@ const plEntrySchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  entryCode: {
+    type: String,
+    trim: true,
+    index: true,
+    sparse: true,
+    unique: true
+  },
   date: {
     type: Date,
     required: true
@@ -56,5 +63,7 @@ const plEntrySchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+plEntrySchema.index({ userId: 1, date: -1, createdAt: -1 });
 
 module.exports = mongoose.model('PLEntry', plEntrySchema);
