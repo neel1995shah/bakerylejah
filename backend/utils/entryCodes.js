@@ -80,11 +80,27 @@ const generateNextEntryCode = async (Model, dateValue) => {
     return '';
   }
 
-  const existingCount = await Model.countDocuments({
-    date: { $gte: bounds.start, $lt: bounds.end }
-  });
+  const dateSegment = formatDateSegment(dateValue);
+  if (!dateSegment) {
+    return '';
+  }
 
-  return buildEntryCode(dateValue, existingCount + 1);
+  const highestEntry = await Model.findOne({
+    entryCode: { $regex: `^${dateSegment}` }
+  })
+    .sort({ entryCode: -1 })
+    .select('entryCode')
+    .lean();
+
+  let nextSequence = 1;
+  if (highestEntry && highestEntry.entryCode) {
+    const highestSequence = Number(String(highestEntry.entryCode).slice(6));
+    if (!Number.isNaN(highestSequence)) {
+      nextSequence = highestSequence + 1;
+    }
+  }
+
+  return buildEntryCode(dateValue, nextSequence);
 };
 
 module.exports = {
