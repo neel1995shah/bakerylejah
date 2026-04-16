@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://bakerylejah.onrender.com';
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_URL = isLocalhost ? 'http://localhost:5000' : 'https://bakerylejah.onrender.com';
 
 export const socket = io(API_URL, {
   autoConnect: false,

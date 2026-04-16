@@ -1,4 +1,5 @@
-const API_URL = process.env.REACT_APP_API_URL || 'https://bakerylejah.onrender.com';
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_URL = isLocalhost ? 'http://localhost:5000' : 'https://bakerylejah.onrender.com';
 const VAPID_PUBLIC_KEY = process.env.REACT_APP_VAPID_PUBLIC_KEY || '';
 
 const urlBase64ToUint8Array = (base64String) => {

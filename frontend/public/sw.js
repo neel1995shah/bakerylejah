@@ -42,7 +42,19 @@ self.addEventListener('push', event => {
     }
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Check if there is an active, focused window
+      const isFocused = clientList.some((client) => client.visibilityState === 'visible');
+      
+      if (isFocused) {
+        // App is actively open, let Toast handle it, suppress OS popup
+        return;
+      }
+
+      return self.registration.showNotification(title, options);
+    })
+  );
 });
 
 self.addEventListener('notificationclick', event => {

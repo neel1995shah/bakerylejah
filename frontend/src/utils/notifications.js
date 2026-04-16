@@ -45,17 +45,7 @@ export const handleNotificationPulse = (payload, currentUser) => {
     console.warn('Audio element not supported:', e);
   }
 
-  // OS-level mobile pull-down notifications mapping safely outside the window!
-  if ('Notification' in window && Notification.permission === 'granted' && navigator.serviceWorker) {
-    navigator.serviceWorker.ready.then(registration => {
-      registration.showNotification(`Finance Alert`, {
-        body: buildNotificationText(payload),
-        icon: '/logo_embedded.svg',
-        vibrate: [200, 100, 200]
-      });
-    }).catch(e => console.warn('Service worker notification failed:', e));
-  }
-
+  // Local app alert is handled via Toast
   toast.info(`${buildNotificationText(payload)}!`, {
     position: "top-right",
     autoClose: 6000,

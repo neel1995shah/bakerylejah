@@ -143,7 +143,33 @@ router.post('/', verifyToken, async (req, res) => {
       entryType: 'LED',
       user: req.username,
       entryCode: entryCode,
-      detailedChanges: []
+      detailedChanges: [
+        {
+          field: 'date',
+          oldValue: '',
+          newValue: new Date(entry.date).toLocaleDateString()
+        },
+        {
+          field: 'name',
+          oldValue: '',
+          newValue: entry.name
+        },
+        {
+          field: 'in',
+          oldValue: '',
+          newValue: entry.in
+        },
+        {
+          field: 'out',
+          oldValue: '',
+          newValue: entry.out
+        },
+        {
+          field: 'total',
+          oldValue: '',
+          newValue: entry.total
+        }
+      ]
     });
 
     res.status(201).json(entry);
@@ -305,7 +331,27 @@ router.delete('/:id', verifyToken, async (req, res) => {
         {
           field: 'name',
           oldValue: entry.name,
-          newValue: '[deleted]'
+          newValue: ''
+        },
+        {
+          field: 'date',
+          oldValue: new Date(entry.date).toLocaleDateString(),
+          newValue: ''
+        },
+        {
+          field: 'in',
+          oldValue: entry.in,
+          newValue: ''
+        },
+        {
+          field: 'out',
+          oldValue: entry.out,
+          newValue: ''
+        },
+        {
+          field: 'total',
+          oldValue: entry.total,
+          newValue: ''
         }
       ]
     });
