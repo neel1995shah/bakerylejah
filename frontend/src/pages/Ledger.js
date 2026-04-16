@@ -19,7 +19,8 @@ const Ledger = ({ token, username }) => {
     date: new Date().toISOString().slice(0, 10),
     name: '',
     in: '',
-    out: ''
+    out: '',
+    notes: ''
   });
   const [accounts, setAccounts] = useState([]);
 
@@ -98,7 +99,7 @@ const Ledger = ({ token, username }) => {
     }
 
     const dateText = new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    return [entry.entryCode, entry.name, entry.in, entry.out, entry.total, dateText, entry.settled ? 'settled' : 'open']
+    return [entry.entryCode, entry.name, entry.in, entry.out, entry.total, entry.notes, dateText, entry.settled ? 'settled' : 'open']
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query));
   });
@@ -169,7 +170,8 @@ const Ledger = ({ token, username }) => {
         date: new Date().toISOString().slice(0, 10),
         name: '',
         in: '',
-        out: ''
+        out: '',
+        notes: ''
       });
       setMessage(editingEntryId ? 'Transaction updated successfully.' : 'Transaction added successfully.');
     } catch (err) {
@@ -185,7 +187,8 @@ const Ledger = ({ token, username }) => {
       date: new Date().toISOString().slice(0, 10),
       name: '',
       in: '',
-      out: ''
+      out: '',
+      notes: ''
     });
     setShowForm(true);
   };
@@ -202,7 +205,8 @@ const Ledger = ({ token, username }) => {
       date: entry.date ? new Date(entry.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
       name: entry.name || '',
       in: entry.in ?? '',
-      out: entry.out ?? ''
+      out: entry.out ?? '',
+      notes: entry.notes ?? ''
     });
     setShowForm(true);
   };
@@ -292,6 +296,7 @@ const Ledger = ({ token, username }) => {
               <th>In</th>
               <th>Out</th>
               <th>Total</th>
+              <th>Notes</th>
               <th>Status</th>
               <th>Action</th>
             </tr>
@@ -302,6 +307,7 @@ const Ledger = ({ token, username }) => {
               <td className={filteredTotalBalance >= 0 ? 'income-text' : 'expense-text'}>
                 <strong>{formatNumber(Number(filteredTotalBalance || 0).toFixed(3).replace(/\.?0+$/, ''), obscuredMode)}</strong>
               </td>
+              <td />
               <td />
               <td />
             </tr>
@@ -316,6 +322,7 @@ const Ledger = ({ token, username }) => {
                   <td className={entry.total >= 0 ? 'income-text' : 'expense-text'}>
                     {formatNumber(Number(entry.total || 0).toFixed(3).replace(/\.?0+$/, ''), obscuredMode)}
                   </td>
+                  <td>{entry.notes || '-'}</td>
                   <td>
                     <span className={`status-chip ${entry.settled ? 'inactive' : 'active'}`}>
                       {entry.settled ? 'Settled' : 'Open'}
@@ -351,7 +358,7 @@ const Ledger = ({ token, username }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="no-data">No ledger transactions match the current search.</td>
+                <td colSpan="9" className="no-data">No ledger transactions match the current search.</td>
               </tr>
             )}
           </tbody>
@@ -431,6 +438,19 @@ const Ledger = ({ token, username }) => {
               <div className="form-group">
                 <label htmlFor="out">Out</label>
                 <input id="out" type="number" name="out" value={formData.out} onChange={handleChange} min="0" step="0.001" />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="ledger-notes">Notes</label>
+                <textarea
+                  id="ledger-notes"
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  placeholder="Optional notes"
+                  maxLength="500"
+                  rows="3"
+                />
               </div>
 
               <div className="pl-modal-actions">

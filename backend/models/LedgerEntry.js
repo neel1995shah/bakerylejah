@@ -32,6 +32,12 @@ const ledgerEntrySchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  notes: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: 500
+  },
   settled: {
     type: Boolean,
     default: false

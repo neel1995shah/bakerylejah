@@ -60,6 +60,7 @@ const recalculateTotals = async (scopeQuery) => {
 const formatLedgerField = (field) => {
   if (field === 'in') return 'in';
   if (field === 'out') return 'out';
+  if (field === 'notes') return 'notes';
   return field;
 };
 
@@ -82,7 +83,7 @@ router.get('/', verifyToken, async (req, res) => {
 
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { date, name, in: amountIn, out: amountOut } = req.body;
+    const { date, name, in: amountIn, out: amountOut, notes } = req.body;
 
     if (!date || !name) {
       return res.status(400).json({ message: 'date and name are required' });
@@ -90,9 +91,14 @@ router.post('/', verifyToken, async (req, res) => {
 
     const safeIn = Number(amountIn || 0);
     const safeOut = Number(amountOut || 0);
+    const safeNotes = String(notes || '').trim();
 
     if ([safeIn, safeOut].some((num) => Number.isNaN(num) || num < 0)) {
       return res.status(400).json({ message: 'in and out must be valid non-negative numbers' });
+    }
+
+    if (safeNotes.length > 500) {
+      return res.status(400).json({ message: 'notes must be 500 characters or fewer' });
     }
 
     const scopeQuery = await buildScopeQuery(req);
@@ -108,6 +114,7 @@ router.post('/', verifyToken, async (req, res) => {
       name,
       in: safeIn,
       out: safeOut,
+      notes: safeNotes,
       settled: false,
       editCount: 0,
       settledAt: null,
@@ -141,6 +148,11 @@ router.post('/', verifyToken, async (req, res) => {
           newValue: entry.out
         },
         {
+          field: 'notes',
+          oldValue: '',
+          newValue: entry.notes || ''
+        },
+        {
           field: 'total',
           oldValue: '',
           newValue: entry.total
@@ -156,7 +168,7 @@ router.post('/', verifyToken, async (req, res) => {
 
 router.put('/:id', verifyToken, async (req, res) => {
   try {
-    const { date, name, in: amountIn, out: amountOut } = req.body;
+    const { date, name, in: amountIn, out: amountOut, notes } = req.body;
 
     if (!date || !name) {
       return res.status(400).json({ message: 'date and name are required' });
@@ -164,9 +176,14 @@ router.put('/:id', verifyToken, async (req, res) => {
 
     const safeIn = Number(amountIn || 0);
     const safeOut = Number(amountOut || 0);
+    const safeNotes = String(notes || '').trim();
 
     if ([safeIn, safeOut].some((num) => Number.isNaN(num) || num < 0)) {
       return res.status(400).json({ message: 'in and out must be valid non-negative numbers' });
+    }
+
+    if (safeNotes.length > 500) {
+      return res.status(400).json({ message: 'notes must be 500 characters or fewer' });
     }
 
     const scopedEntryQuery = await buildScopeQuery(req, { _id: req.params.id });
@@ -191,6 +208,7 @@ router.put('/:id', verifyToken, async (req, res) => {
     if (name !== existingEntry.name) changedFields.push(formatLedgerField('name'));
     if (safeIn !== Number(existingEntry.in || 0)) changedFields.push(formatLedgerField('in'));
     if (safeOut !== Number(existingEntry.out || 0)) changedFields.push(formatLedgerField('out'));
+    if (safeNotes !== String(existingEntry.notes || '')) changedFields.push(formatLedgerField('notes'));
 
     const detailedChanges = [];
     if (normalizeDateValue(date) !== normalizeDateValue(existingEntry.date)) {
@@ -221,6 +239,13 @@ router.put('/:id', verifyToken, async (req, res) => {
         newValue: safeOut
       });
     }
+    if (safeNotes !== String(existingEntry.notes || '')) {
+      detailedChanges.push({
+        field: 'notes',
+        oldValue: existingEntry.notes || '',
+        newValue: safeNotes
+      });
+    }
 
     const entry = await LedgerEntry.findOneAndUpdate(
       scopedEntryQuery,
@@ -229,6 +254,7 @@ router.put('/:id', verifyToken, async (req, res) => {
         name,
         in: safeIn,
         out: safeOut,
+        notes: safeNotes,
         editCount: Number(existingEntry.editCount || 0) + 1
       },
       { new: true }
@@ -322,6 +348,11 @@ router.delete('/:id', verifyToken, async (req, res) => {
         {
           field: 'out',
           oldValue: entry.out,
+          newValue: ''
+        },
+        {
+          field: 'notes',
+          oldValue: entry.notes || '',
           newValue: ''
         },
         {
