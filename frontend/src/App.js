@@ -49,21 +49,40 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const bootstrapSession = async () => {
     const savedToken = localStorage.getItem('token');
     const savedUsername = localStorage.getItem('username');
-    if (savedToken) {
-      setToken(savedToken);
-      setUsername(savedUsername);
-      setIsLoggedIn(true);
+      if (!savedToken || !savedUsername) {
+        return;
+      }
 
-      apiClient.get('/api/notifications')
-        .then((response) => {
-          setNotifications((response.data || []).map(normalizeNotification));
-        })
-        .catch((error) => {
-          console.warn('Failed to load notifications:', error?.response?.data || error.message);
-        });
-    }
+      try {
+        const response = await apiClient.get('/api/notifications');
+        if (!isMounted) {
+          return;
+        }
+
+        setToken(savedToken);
+        setUsername(savedUsername);
+        setNotifications((response.data || []).map(normalizeNotification));
+        setIsLoggedIn(true);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        console.warn('Failed to restore session notifications:', error?.response?.data || error.message);
+        handleLogout();
+      }
+    };
+
+    bootstrapSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {

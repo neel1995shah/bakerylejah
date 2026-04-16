@@ -50,7 +50,19 @@ export const registerPushSubscription = async (token) => {
   });
 
   if (!response.ok) {
-    throw new Error('Failed to register push subscription');
+    if (response.status === 401) {
+      return false;
+    }
+
+    let detail = '';
+    try {
+      const payload = await response.json();
+      detail = payload?.message ? `: ${payload.message}` : '';
+    } catch (error) {
+      detail = '';
+    }
+
+    throw new Error(`Failed to register push subscription${detail}`);
   }
 
   return true;
