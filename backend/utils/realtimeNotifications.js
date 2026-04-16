@@ -165,8 +165,12 @@ const saveSubscription = async (userId, subscription, userAgent = '') => {
   const p256dh = subscription.keys?.p256dh;
   const auth = subscription.keys?.auth;
 
+  if (!Array.isArray(user.pushSubscriptions)) {
+    user.pushSubscriptions = [];
+  }
+
   // Find if it already exists
-  const existingIndex = (user.pushSubscriptions || []).findIndex(sub => sub.endpoint === endpoint);
+  const existingIndex = user.pushSubscriptions.findIndex(sub => sub.endpoint === endpoint);
 
   if (existingIndex >= 0) {
     user.pushSubscriptions[existingIndex].expirationTime = expirationTime;
