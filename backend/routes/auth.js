@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/jwt');
 const router = express.Router();
-const OWNER_USERNAME = String(process.env.OWNER_USERNAME || '').trim().toLowerCase();
 
 const loginAttempts = new Map();
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -50,11 +49,6 @@ router.post('/login', async (req, res) => {
 
     if (!username || !pin) {
       return res.status(400).json({ message: 'Username and PIN required' });
-    }
-
-    if (OWNER_USERNAME && String(username).trim().toLowerCase() !== OWNER_USERNAME) {
-      registerFailedLogin(loginKey);
-      return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     // Find user
