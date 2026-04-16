@@ -34,6 +34,15 @@ function App() {
     read: Boolean(notification.read)
   });
 
+  const handleLogout = useCallback(() => {
+    socket.disconnect();
+    pushSetupRef.current = false;
+    setToken('');
+    setUsername('');
+    setNotifications([]);
+    setIsLoggedIn(false);
+  }, []);
+
   const fetchNotifications = useCallback(async () => {
     const response = await apiClient.get('/api/notifications');
     setNotifications((response.data || []).map(normalizeNotification));
@@ -56,6 +65,17 @@ function App() {
         });
     }
   }, []);
+
+  useEffect(() => {
+    const onAuthExpired = () => {
+      handleLogout();
+    };
+
+    window.addEventListener('finance-auth-expired', onAuthExpired);
+    return () => {
+      window.removeEventListener('finance-auth-expired', onAuthExpired);
+    };
+  }, [handleLogout]);
 
   useEffect(() => {
     if (!token || !username) {
@@ -148,14 +168,6 @@ function App() {
     fetchNotifications().catch(err => {
       console.warn('Failed to load notifications:', err?.response?.data || err.message);
     });
-  };
-
-  const handleLogout = () => {
-    socket.disconnect();
-    setToken('');
-    setUsername('');
-    setNotifications([]);
-    setIsLoggedIn(false);
   };
 
   const clearNotifications = () => {

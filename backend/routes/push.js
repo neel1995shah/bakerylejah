@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { JWT_SECRET } = require('../config/jwt');
 const { saveSubscription } = require('../utils/realtimeNotifications');
 
@@ -13,7 +14,12 @@ const verifyToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.userId = decoded.userId;
+    const userId = String(decoded?.userId || '');
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
+    req.userId = userId;
     next();
   } catch (error) {
     return res.status(401).json({ message: 'Invalid token' });

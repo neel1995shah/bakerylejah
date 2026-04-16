@@ -160,6 +160,10 @@ const saveSubscription = async (userId, subscription, userAgent = '') => {
     return null;
   }
 
+  user.pushSubscriptions = (user.pushSubscriptions || []).filter((entry) => {
+    return Boolean(entry?.endpoint && entry?.keys?.p256dh && entry?.keys?.auth);
+  });
+
   const normalizedSubscription = {
     endpoint: subscription.endpoint,
     expirationTime: subscription.expirationTime ? new Date(subscription.expirationTime) : null,
