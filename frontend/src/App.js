@@ -22,7 +22,7 @@ function App() {
   const [showBell, setShowBell] = useState(false);
   const pushSetupRef = useRef(false);
 
-  const normalizeNotification = (notification) => ({
+  const normalizeNotification = useCallback((notification) => ({
     id: notification._id || notification.id,
     user: notification.user || notification.actorUsername || '',
     action: notification.action || '',
@@ -32,7 +32,7 @@ function App() {
     changes: notification.changes || [],
     date: notification.date || notification.createdAt || new Date().toISOString(),
     read: Boolean(notification.read)
-  });
+  }), []);
 
   const handleLogout = useCallback(() => {
     socket.disconnect();
@@ -48,7 +48,7 @@ function App() {
   const fetchNotifications = useCallback(async () => {
     const response = await apiClient.get('/api/notifications');
     setNotifications((response.data || []).map(normalizeNotification));
-  }, []);
+  }, [normalizeNotification]);
 
   useEffect(() => {
     let isMounted = true;
@@ -87,7 +87,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [handleLogout, normalizeNotification]);
 
   useEffect(() => {
     const onAuthExpired = () => {
@@ -175,7 +175,7 @@ function App() {
     return () => {
       socket.off('realtime-update', handlePing);
     };
-  }, [token, username]);
+  }, [token, username, normalizeNotification]);
 
   const handleLogin = (token, username) => {
     pushSetupRef.current = true;
