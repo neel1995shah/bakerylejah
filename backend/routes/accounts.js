@@ -69,7 +69,28 @@ router.post('/', verifyToken, async (req, res) => {
       entryType: 'ACC',
       user: req.username,
       entryCode: '',
-      detailedChanges: []
+      detailedChanges: [
+        {
+          field: 'handler',
+          oldValue: '',
+          newValue: account.handler
+        },
+        {
+          field: 'account name',
+          oldValue: '',
+          newValue: account.accountName
+        },
+        {
+          field: 'password',
+          oldValue: '',
+          newValue: account.password
+        },
+        {
+          field: 'status',
+          oldValue: '',
+          newValue: account.isActive ? 'active' : 'inactive'
+        }
+      ]
     });
 
     return res.status(201).json(account);
@@ -201,7 +222,22 @@ router.delete('/:id', verifyToken, async (req, res) => {
         {
           field: 'handler',
           oldValue: deleted.handler,
-          newValue: '[deleted]'
+          newValue: ''
+        },
+        {
+          field: 'account name',
+          oldValue: deleted.accountName,
+          newValue: ''
+        },
+        {
+          field: 'password',
+          oldValue: deleted.password,
+          newValue: ''
+        },
+        {
+          field: 'status',
+          oldValue: deleted.isActive ? 'active' : 'inactive',
+          newValue: ''
         }
       ]
     });

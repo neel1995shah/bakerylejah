@@ -114,7 +114,43 @@ router.post('/', verifyToken, async (req, res) => {
       entryType: 'P&L',
       user: req.username,
       entryCode: entryCode,
-      detailedChanges: []
+      detailedChanges: [
+        {
+          field: 'date',
+          oldValue: '',
+          newValue: new Date(entry.date).toLocaleDateString()
+        },
+        {
+          field: 'handler',
+          oldValue: '',
+          newValue: entry.handler
+        },
+        {
+          field: 'account',
+          oldValue: '',
+          newValue: entry.acc
+        },
+        {
+          field: 'in',
+          oldValue: '',
+          newValue: entry.in
+        },
+        {
+          field: 'out',
+          oldValue: '',
+          newValue: entry.out
+        },
+        {
+          field: 'charges',
+          oldValue: '',
+          newValue: entry.charges
+        },
+        {
+          field: 'net profit',
+          oldValue: '',
+          newValue: entry.netProfit
+        }
+      ]
     });
 
     return res.status(201).json(entry);
@@ -310,12 +346,47 @@ router.delete('/:id', verifyToken, async (req, res) => {
         {
           field: 'handler',
           oldValue: entry.handler,
-          newValue: '[deleted]'
+          newValue: ''
+        },
+        {
+          field: 'date',
+          oldValue: new Date(entry.date).toLocaleDateString(),
+          newValue: ''
+        },
+        {
+          field: 'account',
+          oldValue: entry.acc,
+          newValue: ''
+        },
+        {
+          field: 'in',
+          oldValue: entry.in,
+          newValue: ''
+        },
+        {
+          field: 'out',
+          oldValue: entry.out,
+          newValue: ''
+        },
+        {
+          field: 'charges',
+          oldValue: entry.charges,
+          newValue: ''
+        },
+        {
+          field: 'bonus',
+          oldValue: entry.bonus || 0,
+          newValue: ''
+        },
+        {
+          field: 'net profit',
+          oldValue: entry.netProfit,
+          newValue: ''
         },
         {
           field: 'notes',
           oldValue: entry.notes || '',
-          newValue: '[deleted]'
+          newValue: ''
         }
       ]
     });

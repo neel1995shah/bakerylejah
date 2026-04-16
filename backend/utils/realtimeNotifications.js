@@ -36,6 +36,29 @@ const formatChangeList = (changes = []) => {
   return `${cleanChanges.slice(0, -1).join(', ')} and ${cleanChanges[cleanChanges.length - 1]}`;
 };
 
+const formatDetailedChange = (change) => {
+  if (!change || typeof change !== 'object' || !change.field) {
+    return '';
+  }
+
+  const hasOld = change.oldValue !== undefined && change.oldValue !== null && String(change.oldValue) !== '';
+  const hasNew = change.newValue !== undefined && change.newValue !== null && String(change.newValue) !== '';
+
+  if (hasOld && hasNew) {
+    return `${change.field}: ${change.oldValue}→${change.newValue}`;
+  }
+
+  if (!hasOld && hasNew) {
+    return `${change.field}: ${change.newValue}`;
+  }
+
+  if (hasOld && !hasNew) {
+    return `${change.field}: ${change.oldValue}`;
+  }
+
+  return '';
+};
+
 const buildNotificationBody = (payload) => {
   const actor = formatActorInitial(payload.user);
   
@@ -48,15 +71,14 @@ const buildNotificationBody = (payload) => {
     // Format changes with from→to notation
     const changeDetails = (payload.detailedChanges || [])
       .map(change => {
-        if (change.field && change.oldValue !== undefined && change.newValue !== undefined) {
-          return `${change.field}: ${change.oldValue}→${change.newValue}`;
+        if (typeof change === 'string') {
+          return change;
         }
-        return change;
+        return formatDetailedChange(change);
       })
       .filter(Boolean)
       .join(', ');
-    
-        const Notification = require('../models/Notification');
+
     if (!changeDetails) {
       return `${actor} ${actionCode} ${typeCode}`.trim();
     }
@@ -97,12 +119,13 @@ const configureWebPush = () => {
 };
 
 const cleanPayload = (payload = {}) => ({
-  action: payload.action || '',
+  // Support both legacy (action/module) and new (actionType/entryType) shapes.
+  action: payload.action || payload.actionType || '',
   actionType: payload.actionType || '',
   entryType: payload.entryType || '',
   entryCode: payload.entryCode || '',
   user: payload.user || '',
-  module: payload.module || '',
+  module: payload.module || payload.entryType || '',
   changes: Array.isArray(payload.changes) ? payload.changes : [],
   detailedChanges: Array.isArray(payload.detailedChanges) ? payload.detailedChanges : [],
   body: payload.body || ''
@@ -116,11 +139,7 @@ const createNotificationRecord = async (recipientId, payload) => {
         return change;
       }
 
-      if (change && typeof change === 'object' && change.field) {
-        return `${change.field}: ${change.oldValue}→${change.newValue}`;
-      }
-
-      return '';
+      return formatDetailedChange(change);
     })
     .filter(Boolean);
 
@@ -168,6 +187,9 @@ const saveSubscription = async (userId, subscription, userAgent = '') => {
       existing.createdAt = normalizedSubscription.createdAt;
     }
   } else {
+    if (!user.pushSubscriptions) {
+      user.pushSubscriptions = [];
+    }
     user.pushSubscriptions.push(normalizedSubscription);
   }
 
@@ -204,7 +226,9 @@ const sendPushToUser = async (user, payload) => {
 
     try {
       await webpush.sendNotification(webPushSubscription, JSON.stringify(notification));
+      console.log('Successfully pushed web notification to:', subscription.endpoint);
     } catch (error) {
+      console.error('Failed to push web notification:', error);
       if (error.statusCode === 404 || error.statusCode === 410) {
         user.pushSubscriptions = user.pushSubscriptions.filter(
           (entry) => entry.endpoint !== subscription.endpoint
@@ -248,7 +272,9 @@ const broadcastRealtimeNotification = async (io, payload) => {
         date: savedNotification.createdAt,
         actorInitial: formatActorInitial(clean.user)
       });
-    } else if (webPushConfigured) {
+    }
+    
+    if (webPushConfigured) {
       await sendPushToUser(recipient, clean);
     }
   }
