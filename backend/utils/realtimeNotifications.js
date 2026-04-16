@@ -160,45 +160,38 @@ const saveSubscription = async (userId, subscription, userAgent = '') => {
     return null;
   }
 
-  user.pushSubscriptions = (user.pushSubscriptions || []).filter((entry) => {
-    return Boolean(entry?.endpoint && entry?.keys?.p256dh && entry?.keys?.auth);
-  });
+  const endpoint = subscription.endpoint;
+  const expirationTime = subscription.expirationTime ? new Date(subscription.expirationTime) : null;
+  const p256dh = subscription.keys?.p256dh;
+  const auth = subscription.keys?.auth;
 
-  const normalizedSubscription = {
-    endpoint: subscription.endpoint,
-    expirationTime: subscription.expirationTime ? new Date(subscription.expirationTime) : null,
-    keys: {
-      p256dh: subscription.keys?.p256dh,
-      auth: subscription.keys?.auth
-    },
-    userAgent,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  const existingIndex = (user.pushSubscriptions || []).findIndex(
-    (entry) => entry.endpoint === normalizedSubscription.endpoint
-  );
+  // Find if it already exists
+  const existingIndex = (user.pushSubscriptions || []).findIndex(sub => sub.endpoint === endpoint);
 
   if (existingIndex >= 0) {
-    const existing = user.pushSubscriptions[existingIndex];
-    existing.endpoint = normalizedSubscription.endpoint;
-    existing.expirationTime = normalizedSubscription.expirationTime;
-    existing.keys = normalizedSubscription.keys;
-    existing.userAgent = normalizedSubscription.userAgent;
-    existing.updatedAt = normalizedSubscription.updatedAt;
-    if (!existing.createdAt) {
-      existing.createdAt = normalizedSubscription.createdAt;
-    }
+    user.pushSubscriptions[existingIndex].expirationTime = expirationTime;
+    user.pushSubscriptions[existingIndex].keys = { p256dh, auth };
+    user.pushSubscriptions[existingIndex].userAgent = userAgent;
+    user.pushSubscriptions[existingIndex].updatedAt = new Date();
   } else {
-    if (!user.pushSubscriptions) {
-      user.pushSubscriptions = [];
-    }
-    user.pushSubscriptions.push(normalizedSubscription);
+    // If not exists, push new
+    user.pushSubscriptions.push({
+      endpoint,
+      expirationTime,
+      keys: { p256dh, auth },
+      userAgent,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 
+  // Clean out any invalid old ones smoothly
+  user.pushSubscriptions = user.pushSubscriptions.filter(entry => 
+    entry && entry.endpoint && entry.keys && entry.keys.p256dh && entry.keys.auth
+  );
+
   await user.save();
-  return normalizedSubscription;
+  return subscription;
 };
 
 const sendPushToUser = async (user, payload) => {

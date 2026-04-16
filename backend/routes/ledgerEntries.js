@@ -77,6 +77,8 @@ router.get('/', verifyToken, async (req, res) => {
     const rows = buildRunningEntries(entries);
     res.json(rows.reverse());
   } catch (err) {
+    require('fs').appendFileSync(require('path').join(__dirname, '..', 'intercept.log'), 'GET error: ' + String(err.stack) + '\\n');
+    console.error('Ledger Entries GET error:', err);
     res.status(500).json({ message: 'Error fetching ledger entries', error: err.message });
   }
 });
@@ -162,6 +164,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     res.status(201).json(entry);
   } catch (err) {
+    require('fs').appendFileSync('intercept.log', 'POST error: ' + String(err.stack) + '\\n');
     res.status(500).json({ message: 'Error creating ledger entry', error: err.message });
   }
 });

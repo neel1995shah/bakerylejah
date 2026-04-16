@@ -37,6 +37,8 @@ function App() {
   const handleLogout = useCallback(() => {
     socket.disconnect();
     pushSetupRef.current = false;
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
     setToken('');
     setUsername('');
     setNotifications([]);
@@ -54,7 +56,9 @@ function App() {
     const bootstrapSession = async () => {
     const savedToken = localStorage.getItem('token');
     const savedUsername = localStorage.getItem('username');
-      if (!savedToken || !savedUsername) {
+      if (!savedToken || savedToken === 'undefined' || savedToken === 'null' || !savedUsername || savedUsername === 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
         return;
       }
 

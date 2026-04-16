@@ -16,16 +16,20 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
   ...(process.env.FRONTEND_URLS || '').split(','),
   'http://localhost:3000',
-  'http://localhost:5173'
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173'
 ]
   .map((url) => (url || '').trim())
   .filter(Boolean);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || String(origin).includes('localhost:') || String(origin).includes('127.0.0.1:') || String(origin).includes('192.168.')) {
       callback(null, true);
     } else {
+      require('fs').appendFileSync('intercept.log', 'CORS rejected origin: ' + origin + '\\n');
+      console.error('CORS rejected origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },

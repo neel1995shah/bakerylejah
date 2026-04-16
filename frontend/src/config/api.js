@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const API_URL = isLocalhost ? 'http://localhost:5000' : 'https://bakerylejah.onrender.com';
+const API_URL = isLocalhost ? `http://${window.location.hostname}:5000` : 'https://bakerylejah.onrender.com';
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -13,10 +13,10 @@ const apiClient = axios.create({
 // Add token to requests if it exists
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  if (token) {
+  if (token && token.trim() !== '' && token !== 'undefined' && token !== 'null') {
     if (config.headers && typeof config.headers.set === 'function') {
       config.headers.set('Authorization', `Bearer ${token}`);
-    } else {
+    } else if (config.headers) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
   }
